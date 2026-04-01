@@ -65,7 +65,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-red-700 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-slate-900 to-emerald-950 p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="text-5xl mb-2">⚽</div>
@@ -107,7 +107,7 @@ export default function Auth() {
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full bg-blue-700 hover:bg-blue-800" disabled={loading}>
+                  <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={loading}>
                     {loading ? 'Ingresando...' : 'Ingresar'}
                   </Button>
                 </form>
@@ -160,7 +160,7 @@ export default function Auth() {
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full bg-red-600 hover:bg-red-700" disabled={loading}>
+                  <Button type="submit" className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground" disabled={loading}>
                     {loading ? 'Creando cuenta...' : 'Crear cuenta'}
                   </Button>
                 </form>

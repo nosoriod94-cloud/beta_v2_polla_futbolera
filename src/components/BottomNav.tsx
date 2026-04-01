@@ -21,13 +21,13 @@ export default function BottomNav() {
             className={({ isActive }) =>
               cn(
                 'flex-1 flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors',
-                isActive ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground hover:text-foreground'
+                isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               )
             }
           >
             {({ isActive }) => (
               <>
-                <Icon className={cn('h-5 w-5', isActive && 'fill-blue-600/20 dark:fill-blue-400/20')} />
+                <Icon className={cn('h-5 w-5', isActive && 'fill-primary/20')} />
                 <span>{label}</span>
               </>
             )}

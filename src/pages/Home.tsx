@@ -12,9 +12,9 @@ import { useToast } from '@/hooks/use-toast'
 import { Plus, Shield, Users, Clock, Lock, AlertTriangle } from 'lucide-react'
 
 const statusLabels: Record<string, { label: string; color: string }> = {
-  pending: { label: 'Pendiente de aprobación', color: 'bg-yellow-100 text-yellow-800' },
-  authorized: { label: 'Autorizado', color: 'bg-green-100 text-green-800' },
-  blocked: { label: 'Bloqueado', color: 'bg-red-100 text-red-800' },
+  pending: { label: 'Pendiente de aprobación', color: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' },
+  authorized: { label: 'Autorizado', color: 'bg-green-500/10 text-green-400 border border-green-500/20' },
+  blocked: { label: 'Bloqueado', color: 'bg-red-500/10 text-red-400 border border-red-500/20' },
 }
 
 export default function Home() {
@@ -84,11 +84,11 @@ export default function Home() {
 
       {/* Banner: cuenta suspendida */}
       {isSuspended && (
-        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-          <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+          <AlertTriangle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-red-800">Cuenta suspendida</p>
-            <p className="text-xs text-red-600 mt-0.5">
+            <p className="text-sm font-medium text-red-400">Cuenta suspendida</p>
+            <p className="text-xs text-red-400/80 mt-0.5">
               Tu cuenta ha sido suspendida. Contacta a{' '}
               <strong>hola@pollafutbolera.online</strong> para resolver la situación.
             </p>
@@ -101,7 +101,7 @@ export default function Home() {
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Shield className="h-4 w-4 text-blue-600" />
+              <Shield className="h-4 w-4 text-primary" />
               Mis pollas (admin)
             </h2>
             {license && (
@@ -115,7 +115,7 @@ export default function Home() {
           {license?.canCreate && (
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" className="bg-blue-700 hover:bg-blue-800">
+                <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
                   <Plus className="h-4 w-4 mr-1" /> Nueva
                 </Button>
               </DialogTrigger>
@@ -185,7 +185,7 @@ export default function Home() {
                 <CardHeader className="py-3 px-4">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">{polla.nombre}</CardTitle>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${polla.is_active ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${polla.is_active ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-muted text-muted-foreground'}`}>
                       {polla.is_active ? 'Activa' : 'Inactiva'}
                     </span>
                   </div>
@@ -213,7 +213,7 @@ export default function Home() {
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Users className="h-4 w-4 text-green-600" />
+            <Users className="h-4 w-4 text-secondary" />
             Pollas donde participo
           </h2>
           <Dialog open={joinOpen} onOpenChange={setJoinOpen}>
@@ -237,7 +237,7 @@ export default function Home() {
                     maxLength={8}
                   />
                   {joinCode.length >= 6 && (
-                    <div className={`text-xs rounded-lg px-3 py-2 ${pollaEncontrada ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                    <div className={`text-xs rounded-lg px-3 py-2 ${pollaEncontrada ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
                       {pollaEncontrada
                         ? `✓ Polla encontrada: "${pollaEncontrada.nombre}"`
                         : '✗ No se encontró ninguna polla con ese código'}
@@ -299,7 +299,7 @@ export default function Home() {
                       </span>
                     </div>
                     {pp.status === 'pending' && (
-                      <p className="text-xs text-yellow-700 bg-yellow-50 rounded p-2 mt-1">
+                      <p className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded p-2 mt-1">
                         Tu solicitud está pendiente. El admin debe aprobarte.
                       </p>
                     )}
