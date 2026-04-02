@@ -41,9 +41,9 @@ export default function Home() {
 
   async function handleCreatePolla(e: React.FormEvent) {
     e.preventDefault()
-    if (!newPollaName.trim()) return
+    if (!newPollaName.trim() || !license?.id) return
     try {
-      const polla = await createPolla.mutateAsync(newPollaName.trim())
+      const polla = await createPolla.mutateAsync({ nombre: newPollaName.trim(), licenseId: license.id })
       toast({ title: 'Polla creada', description: `"${polla.nombre}" está lista para configurar.` })
       setCreateOpen(false)
       setNewPollaName('')

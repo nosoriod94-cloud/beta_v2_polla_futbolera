@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
-import { Plus, CheckCircle, Shield, LogOut, ToggleLeft, ToggleRight, Users, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, CheckCircle, Shield, LogOut, ToggleLeft, ToggleRight, Users, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -19,7 +20,10 @@ export default function SuperAdmin() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const [clientEmail, setClientEmail] = useState('')
+  const [clienteNombre, setClienteNombre] = useState('')
   const [showPollas, setShowPollas] = useState(false)
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null)
+  const [codeCopied, setCodeCopied] = useState(false)
 
   const { data: licenses = [], isLoading: loadingLicenses } = useAllLicenses()
   const { data: allPollas = [], isLoading: loadingPollas } = useAllPollas()
@@ -38,15 +42,23 @@ export default function SuperAdmin() {
     e.preventDefault()
     if (!clientEmail.trim()) return
     try {
-      await grantLicense.mutateAsync(clientEmail.trim().toLowerCase())
-      toast({
-        title: 'Licencia otorgada',
-        description: `${clientEmail.trim()} ya puede crear hasta 3 pollas.`,
+      const code = await grantLicense.mutateAsync({
+        email: clientEmail.trim().toLowerCase(),
+        clienteNombre: clienteNombre.trim() || undefined,
       })
+      setGeneratedCode(code)
       setClientEmail('')
+      setClienteNombre('')
     } catch (err: unknown) {
-      toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error al otorgar licencia', description: (err as Error).message, variant: 'destructive' })
     }
+  }
+
+  function handleCopyCode() {
+    if (!generatedCode) return
+    navigator.clipboard.writeText(generatedCode)
+    setCodeCopied(true)
+    setTimeout(() => setCodeCopied(false), 2000)
   }
 
   async function handleToggle(email: string, currentActive: boolean) {
@@ -95,6 +107,42 @@ export default function SuperAdmin() {
           <LogOut className="h-4 w-4 mr-1" /> Salir
         </Button>
       </div>
+
+      {/* Dialog: código generado */}
+      <Dialog open={!!generatedCode} onOpenChange={() => { setGeneratedCode(null); setCodeCopied(false) }}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-green-400 flex items-center gap-2">
+              <CheckCircle className="h-5 w-5" /> Licencia otorgada
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-slate-300">
+              Comparte este código con tu cliente. Lo usará para registrarse en:
+            </p>
+            <code className="block text-xs text-slate-400 bg-slate-800 rounded px-2 py-1">
+              /client-admin/register
+            </code>
+            <div className="bg-slate-800 rounded-lg p-4 text-center">
+              <p className="text-3xl font-mono font-bold tracking-widest text-white">
+                {generatedCode}
+              </p>
+            </div>
+            <Button
+              className="w-full bg-purple-700 hover:bg-purple-600"
+              onClick={handleCopyCode}
+            >
+              {codeCopied
+                ? <><Check className="h-4 w-4 mr-2" /> Copiado</>
+                : <><Copy className="h-4 w-4 mr-2" /> Copiar código</>
+              }
+            </Button>
+            <p className="text-xs text-slate-500 text-center">
+              El código solo se muestra una vez. Guárdalo antes de cerrar.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="p-4 space-y-6 max-w-lg mx-auto">
 
@@ -190,10 +238,20 @@ export default function SuperAdmin() {
                   className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
                   required
                 />
-                <p className="text-xs text-slate-500">
-                  El cliente debe registrarse con exactamente este correo. Recibirá 3 pollas.
-                </p>
               </div>
+              <div className="space-y-2">
+                <Label className="text-slate-300 text-sm">Nombre de referencia <span className="text-slate-500">(opcional)</span></Label>
+                <Input
+                  type="text"
+                  placeholder="Ej: Juan Pérez - Liga Amigos"
+                  value={clienteNombre}
+                  onChange={e => setClienteNombre(e.target.value)}
+                  className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                />
+              </div>
+              <p className="text-xs text-slate-500">
+                El cliente usará el código generado para registrarse en /client-admin/register con este correo. Recibirá 3 pollas.
+              </p>
               <Button
                 type="submit"
                 className="w-full bg-purple-700 hover:bg-purple-600"
@@ -229,8 +287,14 @@ export default function SuperAdmin() {
                         <p className={`text-sm font-medium truncate ${l.is_active ? 'text-white' : 'text-red-300 line-through'}`}>
                           {l.email_autorizado}
                         </p>
+                        {l.cliente_nombre && (
+                          <p className="text-xs text-slate-400 truncate">{l.cliente_nombre}</p>
+                        )}
                         <p className="text-xs text-slate-500 mt-0.5">
                           {l.pollas_created}/{l.pollas_limit} pollas · Desde {format(new Date(l.created_at), "d MMM yyyy", { locale: es })}
+                        </p>
+                        <p className="text-xs font-mono text-purple-400 mt-0.5">
+                          Código: {l.license_code}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">

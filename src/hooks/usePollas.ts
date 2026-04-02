@@ -5,17 +5,21 @@ import { z } from 'zod'
 
 const PollaNombreSchema = z.string().min(3, 'El nombre debe tener al menos 3 caracteres').max(100)
 
-export function useMyPollas() {
+export function useMyPollas(licenseId?: string) {
   const { user } = useAuth()
   return useQuery({
-    queryKey: ['pollas', user?.id],
+    queryKey: ['pollas', user?.id, licenseId],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('pollas')
         .select('*')
         .eq('admin_user_id', user!.id)
         .order('created_at', { ascending: false })
+      if (licenseId) {
+        query = query.eq('license_id', licenseId)
+      }
+      const { data, error } = await query
       if (error) throw error
       return data
     },
@@ -39,7 +43,8 @@ export function useMyParticipatingPollas() {
   })
 }
 
-// Retorna el estado completo de la licencia del usuario actual
+// Retorna la primera licencia activa con capacidad (o la primera activa).
+// Soporta multi-licencia: si hay varias, prioriza la que tiene capacidad disponible.
 export function useLicense() {
   const { user } = useAuth()
   return useQuery({
@@ -48,16 +53,21 @@ export function useLicense() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('licenses')
-        .select('pollas_limit, pollas_created, is_active')
+        .select('id, pollas_limit, pollas_created, is_active')
         .eq('email_autorizado', user!.email!.toLowerCase())
-        .maybeSingle()
+        .order('created_at', { ascending: true })
       if (error) throw error
-      if (!data) return null
+      if (!data || data.length === 0) return null
+      // Priorizar: activa con capacidad > activa sin capacidad > cualquiera
+      const best = data.find(l => l.is_active && l.pollas_created < l.pollas_limit)
+        ?? data.find(l => l.is_active)
+        ?? data[0]
       return {
-        canCreate: data.is_active && data.pollas_created < data.pollas_limit,
-        pollasCreated: data.pollas_created,
-        pollasLimit: data.pollas_limit,
-        isActive: data.is_active,
+        id: best.id,
+        canCreate: best.is_active && best.pollas_created < best.pollas_limit,
+        pollasCreated: best.pollas_created,
+        pollasLimit: best.pollas_limit,
+        isActive: best.is_active,
       }
     },
   })
@@ -76,12 +86,12 @@ export function useCreatePolla() {
   const qc = useQueryClient()
   const { user } = useAuth()
   return useMutation({
-    mutationFn: async (nombre: string) => {
+    mutationFn: async ({ nombre, licenseId }: { nombre: string; licenseId: string }) => {
       PollaNombreSchema.parse(nombre)
-      // 1. Crear la polla (invite_code se genera automáticamente via trigger)
+      // 1. Crear la polla con license_id (invite_code se genera automáticamente via trigger)
       const { data: polla, error: pollaErr } = await supabase
         .from('pollas')
-        .insert({ nombre, admin_user_id: user!.id })
+        .insert({ nombre, admin_user_id: user!.id, license_id: licenseId })
         .select()
         .single()
       if (pollaErr) throw pollaErr
@@ -97,9 +107,11 @@ export function useCreatePolla() {
 
       return polla
     },
-    onSuccess: () => {
+    onSuccess: (_data, { licenseId }) => {
       qc.invalidateQueries({ queryKey: ['pollas', user?.id] })
       qc.invalidateQueries({ queryKey: ['license', user?.email] })
+      qc.invalidateQueries({ queryKey: ['my_licenses', user?.id] })
+      qc.invalidateQueries({ queryKey: ['pollas', user?.id, licenseId] })
     },
   })
 }
@@ -137,6 +149,53 @@ export function usePollaByInviteCode(inviteCode: string | undefined) {
 }
 
 // ─────────────────────────────────────────────
+// Hooks para Cliente Admin (multi-licencia)
+// ─────────────────────────────────────────────
+
+export type MyLicense = {
+  id: string
+  license_code: string
+  nombre_licencia: string | null
+  cliente_nombre: string | null
+  pollas_limit: number
+  pollas_created: number
+  is_active: boolean
+  created_at: string
+}
+
+// Retorna todas las licencias del usuario actual (puede ser más de una)
+export function useMyLicenses() {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: ['my_licenses', user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_my_licenses')
+      if (error) throw error
+      return data as MyLicense[]
+    },
+  })
+}
+
+// Permite al Cliente Admin nombrar/renombrar una licencia
+export function useSetLicenseNombre() {
+  const qc = useQueryClient()
+  const { user } = useAuth()
+  return useMutation({
+    mutationFn: async ({ licenseId, nombre }: { licenseId: string; nombre: string }) => {
+      const { error } = await supabase.rpc('set_license_nombre', {
+        p_license_id: licenseId,
+        p_nombre: nombre,
+      })
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my_licenses', user?.id] })
+    },
+  })
+}
+
+// ─────────────────────────────────────────────
 // Hooks exclusivos para SuperAdmin
 // ─────────────────────────────────────────────
 
@@ -169,6 +228,8 @@ export function useAllLicenses() {
         is_active: boolean
         otorgada_por: string | null
         created_at: string
+        license_code: string
+        cliente_nombre: string | null
       }>
     },
   })
@@ -178,13 +239,27 @@ export function useGrantLicense() {
   const qc = useQueryClient()
   const { user } = useAuth()
   return useMutation({
-    mutationFn: async (email: string) => {
-      const { error } = await supabase
-        .rpc('grant_license', { p_superadmin_id: user!.id, p_email: email })
+    mutationFn: async ({ email, clienteNombre }: { email: string; clienteNombre?: string }) => {
+      const { data, error } = await supabase.rpc('grant_license', {
+        p_superadmin_id: user!.id,
+        p_email: email,
+        p_cliente_nombre: clienteNombre || null,
+      })
       if (error) throw new Error(error.message)
+      return data as string // license_code
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['licenses'] })
+    },
+  })
+}
+
+export function useLookupLicenseCode() {
+  return useMutation({
+    mutationFn: async (code: string) => {
+      const { data, error } = await supabase.rpc('lookup_license_code', { p_code: code })
+      if (error) throw new Error(error.message)
+      return data as { email: string; cliente_nombre: string | null }
     },
   })
 }

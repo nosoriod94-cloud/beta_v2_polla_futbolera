@@ -14,6 +14,8 @@ import PollaView from "./pages/PollaView";
 import Perfil from "./pages/Perfil";
 import SuperAdmin from "./pages/SuperAdmin";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
+import ClientAdmin from "./pages/ClientAdmin";
+import ClientAdminRegister from "./pages/ClientAdminRegister";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -81,6 +83,18 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <SuperAdmin />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Cliente Admin — registro con código y panel */}
+            <Route path="/client-admin/register" element={<ClientAdminRegister />} />
+            <Route path="/client-admin/login" element={<Auth />} />
+            <Route
+              path="/client-admin"
+              element={
+                <ProtectedRoute>
+                  <ClientAdmin />
                 </ProtectedRoute>
               }
             />

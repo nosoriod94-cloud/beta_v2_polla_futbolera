@@ -36,6 +36,8 @@ export interface Database {
           nombre: string
           admin_user_id: string
           is_active: boolean
+          invite_code: string | null
+          license_id: string | null
           created_at: string
         }
         Insert: {
@@ -43,11 +45,14 @@ export interface Database {
           nombre: string
           admin_user_id: string
           is_active?: boolean
+          invite_code?: string | null
+          license_id?: string | null
           created_at?: string
         }
         Update: {
           nombre?: string
           is_active?: boolean
+          license_id?: string | null
         }
       }
       polla_participants: {
