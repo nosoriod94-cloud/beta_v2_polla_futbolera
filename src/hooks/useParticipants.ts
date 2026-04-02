@@ -9,6 +9,24 @@ const ApodoSchema = z.string()
   .max(50, 'El apodo no puede superar 50 caracteres')
   .regex(/^[a-zA-Z0-9 ÁÉÍÓÚáéíóúÑñüÜ._'-]+$/, 'El apodo contiene caracteres no permitidos')
 
+// Verifica en tiempo real si un apodo está disponible en una polla.
+// Usa debounce externo; llama al RPC check_apodo_available.
+export function useApodoAvailable(pollaId: string | undefined, apodo: string) {
+  return useQuery({
+    queryKey: ['apodo_available', pollaId, apodo.toLowerCase().trim()],
+    enabled: !!pollaId && apodo.trim().length >= 2,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('check_apodo_available', {
+        p_polla_id: pollaId!,
+        p_apodo: apodo.trim(),
+      })
+      if (error) throw error
+      return data as boolean // true = disponible
+    },
+    staleTime: 0,
+  })
+}
+
 // Para uso del Admin: incluye profiles(nombre_completo) para identificar al usuario
 export function useParticipants(pollaId: string | undefined) {
   return useQuery({

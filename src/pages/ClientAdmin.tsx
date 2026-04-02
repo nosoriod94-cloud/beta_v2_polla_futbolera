@@ -5,7 +5,7 @@ import {
   useMyLicenses, useSetLicenseNombre, useMyPollas, useCreatePolla,
   useMyParticipatingPollas, usePollaByInviteCode, type MyLicense,
 } from '@/hooks/usePollas'
-import { useJoinPolla } from '@/hooks/useParticipants'
+import { useJoinPolla, useApodoAvailable } from '@/hooks/useParticipants'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -361,6 +361,7 @@ export default function ClientAdmin() {
   const [joinOpen, setJoinOpen] = useState(false)
 
   const { data: pollaEncontrada } = usePollaByInviteCode(joinCode)
+  const { data: apodoDisponible, isLoading: checkingApodo } = useApodoAvailable(pollaEncontrada?.id, joinApodo)
 
   // Si no tiene licencias y terminó de cargar, ir al home normal
   if (!loadingLicenses && licenses.length === 0) {
@@ -480,19 +481,27 @@ export default function ClientAdmin() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-slate-300">Tu apodo en esta polla</Label>
+                    <Label className="text-slate-300">Tu alias en esta polla</Label>
                     <Input
-                      placeholder="ElProfe, TioChucho..."
+                      placeholder="ElProfe, TioChucho, CR7Fan..."
                       value={joinApodo}
                       onChange={e => setJoinApodo(e.target.value)}
                       className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
                       disabled={!pollaEncontrada}
                     />
+                    <p className="text-xs text-slate-500">
+                      Así aparecerás en la tabla de posiciones. Elige un alias único.
+                    </p>
+                    {pollaEncontrada && joinApodo.trim().length >= 2 && (
+                      <p className={`text-xs font-medium ${checkingApodo ? 'text-slate-400' : apodoDisponible ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {checkingApodo ? '⏳ Verificando...' : apodoDisponible ? '✓ Alias disponible' : '✗ Este alias ya está en uso en esta polla'}
+                      </p>
+                    )}
                   </div>
                   <Button
                     type="submit"
                     className="w-full bg-blue-700 hover:bg-blue-600"
-                    disabled={!pollaEncontrada || !joinApodo.trim() || joinPolla.isPending}
+                    disabled={!pollaEncontrada || !joinApodo.trim() || joinPolla.isPending || apodoDisponible === false}
                   >
                     {joinPolla.isPending ? 'Enviando solicitud...' : 'Solicitar unirme'}
                   </Button>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useMyPollas, useCreatePolla, useMyParticipatingPollas, usePollaByInviteCode, useLicense } from '@/hooks/usePollas'
-import { useJoinPolla } from '@/hooks/useParticipants'
+import { useJoinPolla, useApodoAvailable } from '@/hooks/useParticipants'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -38,6 +38,7 @@ export default function Home() {
   const [joinOpen, setJoinOpen] = useState(false)
 
   const { data: pollaEncontrada } = usePollaByInviteCode(joinCode)
+  const { data: apodoDisponible, isLoading: checkingApodo } = useApodoAvailable(pollaEncontrada?.id, joinApodo)
 
   async function handleCreatePolla(e: React.FormEvent) {
     e.preventDefault()
@@ -245,18 +246,26 @@ export default function Home() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Tu apodo en esta polla</Label>
+                  <Label>Tu alias en esta polla</Label>
                   <Input
-                    placeholder="ElProfe, TioChucho..."
+                    placeholder="ElProfe, TioChucho, CR7Fan..."
                     value={joinApodo}
                     onChange={e => setJoinApodo(e.target.value)}
                     disabled={!pollaEncontrada}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Así aparecerás en la tabla de posiciones. Elige un alias único.
+                  </p>
+                  {pollaEncontrada && joinApodo.trim().length >= 2 && (
+                    <p className={`text-xs font-medium ${checkingApodo ? 'text-muted-foreground' : apodoDisponible ? 'text-green-600' : 'text-red-500'}`}>
+                      {checkingApodo ? '⏳ Verificando...' : apodoDisponible ? '✓ Alias disponible' : '✗ Este alias ya está en uso en esta polla'}
+                    </p>
+                  )}
                 </div>
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={!pollaEncontrada || !joinApodo.trim() || joinPolla.isPending}
+                  disabled={!pollaEncontrada || !joinApodo.trim() || joinPolla.isPending || apodoDisponible === false}
                 >
                   {joinPolla.isPending ? 'Enviando solicitud...' : 'Solicitar unirme'}
                 </Button>
