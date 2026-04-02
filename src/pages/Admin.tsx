@@ -197,8 +197,9 @@ export default function Admin() {
   }
 
   function copyPollaId() {
-    navigator.clipboard.writeText(pollaId!)
-    toast({ title: 'ID copiado', description: 'Compártelo con los participantes.' })
+    const code = polla?.invite_code ?? pollaId!
+    navigator.clipboard.writeText(code)
+    toast({ title: '¡Código copiado!', description: 'Compártelo con los participantes para que se unan.' })
   }
 
   async function handleRequestLimit() {
@@ -232,13 +233,15 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* ID para compartir */}
-      <Card className="bg-blue-50 border-blue-200">
+      {/* Código de invitación para compartir */}
+      <Card className="bg-emerald-950/40 border-emerald-800/50">
         <CardContent className="py-3 px-4">
-          <p className="text-xs text-blue-700 font-medium mb-1">ID de la polla (para compartir)</p>
+          <p className="text-xs text-emerald-400 font-medium mb-2">Código de invitación para participantes</p>
           <div className="flex items-center gap-2">
-            <code className="text-xs bg-white border rounded px-2 py-1 flex-1 truncate">{pollaId}</code>
-            <Button size="sm" variant="outline" onClick={copyPollaId} className="shrink-0">
+            <code className="text-2xl font-mono font-bold tracking-widest text-white flex-1 text-center bg-slate-900 rounded px-3 py-1.5">
+              {polla?.invite_code ?? '—'}
+            </code>
+            <Button size="sm" onClick={copyPollaId} className="shrink-0 bg-emerald-700 hover:bg-emerald-600 text-white">
               <Copy className="h-3 w-3 mr-1" /> Copiar
             </Button>
           </div>
@@ -327,7 +330,7 @@ export default function Admin() {
           {participants.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-8 text-center text-muted-foreground text-sm">
-                Nadie se ha unido todavía. Comparte el ID de la polla.
+                Nadie se ha unido todavía. Comparte el código de invitación.
               </CardContent>
             </Card>
           ) : (
