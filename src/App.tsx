@@ -81,7 +81,7 @@ const App = () => (
             <Route
               path="/superadmin"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute redirectTo="/superadmin/login">
                   <SuperAdmin />
                 </ProtectedRoute>
               }
@@ -93,7 +93,7 @@ const App = () => (
             <Route
               path="/client-admin"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute redirectTo="/client-admin/login">
                   <ClientAdmin />
                 </ProtectedRoute>
               }

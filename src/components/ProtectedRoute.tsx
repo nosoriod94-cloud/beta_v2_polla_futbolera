@@ -1,7 +1,13 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 
-export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
+export default function ProtectedRoute({
+  children,
+  redirectTo = '/auth',
+}: {
+  children: React.ReactNode
+  redirectTo?: string
+}) {
   const { user, loading } = useAuth()
 
   if (loading) {
@@ -15,7 +21,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     )
   }
 
-  if (!user) return <Navigate to="/auth" replace />
+  if (!user) return <Navigate to={redirectTo} replace />
 
   return <>{children}</>
 }
