@@ -1,10 +1,22 @@
+import { useEffect } from 'react'
 import { NavLink, useMatch } from 'react-router-dom'
 import { Home, Trophy, Star, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+const LAST_POLLA_KEY = 'lastPollaId'
+
 export default function BottomNav() {
   const pollaMatch = useMatch('/polla/:pollaId/*')
-  const pollaId = pollaMatch?.params.pollaId
+  const pollaIdFromUrl = pollaMatch?.params.pollaId
+
+  // Persist the last visited pollaId so buttons work from any page
+  useEffect(() => {
+    if (pollaIdFromUrl) {
+      localStorage.setItem(LAST_POLLA_KEY, pollaIdFromUrl)
+    }
+  }, [pollaIdFromUrl])
+
+  const pollaId = pollaIdFromUrl ?? localStorage.getItem(LAST_POLLA_KEY) ?? null
 
   const links = [
     { to: '/', label: 'Inicio', icon: Home, exact: true },
