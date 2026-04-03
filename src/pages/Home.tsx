@@ -294,7 +294,7 @@ export default function Home() {
                 <Card
                   key={pp.polla_id}
                   className={`cursor-pointer hover:shadow-md transition-shadow ${pp.status !== 'authorized' ? 'opacity-75' : ''}`}
-                  onClick={() => pp.status === 'authorized' && navigate(`/polla/${pp.polla_id}`)}
+                  onClick={() => pp.status === 'authorized' && navigate(`/polla/${pp.polla_id}/predicciones`)}
                 >
                   <CardHeader className="py-3 px-4">
                     <div className="flex items-center justify-between">
