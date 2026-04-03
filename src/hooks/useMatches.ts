@@ -169,3 +169,28 @@ export function useDeleteMatch() {
     },
   })
 }
+
+export function useUpdateJornada() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      jornadaId,
+      pollaId,
+      puntosPorAcierto,
+    }: {
+      jornadaId: string
+      pollaId: string
+      puntosPorAcierto: number
+    }) => {
+      z.number().int().min(1).max(50).parse(puntosPorAcierto)
+      const { error } = await supabase
+        .from('jornadas')
+        .update({ puntos_por_acierto: puntosPorAcierto })
+        .eq('id', jornadaId)
+      if (error) throw error
+    },
+    onSuccess: (_data, { pollaId }) => {
+      qc.invalidateQueries({ queryKey: ['jornadas', pollaId] })
+    },
+  })
+}
