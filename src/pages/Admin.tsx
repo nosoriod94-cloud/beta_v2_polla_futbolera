@@ -831,7 +831,9 @@ export default function Admin() {
             </Card>
           ) : (
             jornadas.map(jornada => {
-              const jornadaMatches = matches.filter(m => m.jornada_id === jornada.id)
+              const jornadaMatches = matches
+                .filter(m => m.jornada_id === jornada.id)
+                .sort((a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime())
               const isEditingThis = editingJornadaId === jornada.id
               return (
                 <div key={jornada.id} className="space-y-2">
