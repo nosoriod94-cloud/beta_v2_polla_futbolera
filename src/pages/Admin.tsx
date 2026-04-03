@@ -126,20 +126,18 @@ function excelDateToDDMMYYYY(val: unknown): string {
  *  correctamente en lugar de depender del formato de celda del archivo. */
 function parseExcelBuffer(buffer: ArrayBuffer): CsvRow[] {
   const wb = XLSX.read(buffer, { type: 'array' })
-  const ws = wb.Sheets[wb.SheetNames[0]]
+  // Usar hoja "Partidos" si existe; si no, la primera hoja
+  const sheetName = wb.SheetNames.includes('Partidos') ? 'Partidos' : wb.SheetNames[0]
+  const ws = wb.Sheets[sheetName]
   const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, {
     header: 1,
-    raw: true,   // valores crudos: números para fecha/hora, strings para texto
+    raw: true,
     defval: '',
   }) as unknown[][]
 
-  // Encontrar la fila de encabezados (ignora instrucciones al inicio)
-  const headerIdx = rows.findIndex(r =>
-    (r as unknown[]).some(c => String(c).toLowerCase().includes('jornada'))
-  )
-  if (headerIdx === -1 || headerIdx >= rows.length - 1) return []
-
-  return rows.slice(headerIdx + 1)
+  // Fila 0 = encabezados, datos desde fila 1
+  if (rows.length < 2) return []
+  return rows.slice(1)
     .filter(cols => (cols as unknown[]).some(c => String(c).trim()))
     .map(cols => ({
       jornada:  String((cols as unknown[])[0] ?? '').trim(),
@@ -190,54 +188,46 @@ function validateAndEnrichRows(rows: CsvRow[], jornadaNames: string[]): CsvRow[]
 function downloadTemplate(jornadaNames: string[]) {
   const wb = XLSX.utils.book_new()
 
-  const data = [
-    // Fila 1: instrucciones
-    [
-      '⚠️ INSTRUCCIONES: Llena desde la fila 3. ' +
-      '"jornada" debe coincidir exactamente con la jornada de la polla. ' +
-      'FECHA: formato Colombia DD/MM/AAAA (ej: 15/06/2026 = 15 de junio). ' +
-      'HORA: hora Colombia, ej: 20:00 o 8 pm.',
-      '', '', '', '', '',
-    ],
-    // Fila 2: encabezados
-    ['jornada', 'equipo_a', 'equipo_b', 'fecha  (DD/MM/AAAA)', 'hora_bogota', 'estadio'],
-    // Filas de ejemplo
-    [jornadaNames[0] ?? 'Jornada 1', 'Colombia', 'Brasil',    '15/06/2026', '20:00', 'MetLife Stadium'],
-    [jornadaNames[0] ?? 'Jornada 1', 'Argentina', 'México',   '16/06/2026', '17:00', ''],
-  ]
+  // ── Hoja 1: Partidos (limpia — solo encabezados + ejemplos) ──────────────
+  const wsPartidos = XLSX.utils.aoa_to_sheet([
+    ['jornada', 'equipo_a', 'equipo_b', 'fecha (DD/MM/AAAA)', 'hora_bogota', 'estadio'],
+    [jornadaNames[0] ?? 'Jornada 1', 'Colombia',  'Brasil',  '15/06/2026', '20:00', 'MetLife Stadium'],
+    [jornadaNames[0] ?? 'Jornada 1', 'Argentina', 'México',  '16/06/2026', '17:00', ''],
+  ])
 
-  const ws = XLSX.utils.aoa_to_sheet(data)
-
-  // ── Pre-formatear las columnas fecha (D) y hora (E) como Texto ──────────────
-  // Esto evita que Excel interprete las fechas/horas según la configuración
-  // regional del computador del usuario (que podría cambiar DD/MM por MM/DD).
-  // Filas 3-52 cubre hasta 50 partidos; celdas vacías con format '@' (texto).
-  for (let r = 2; r < 52; r++) {
-    const fechaAddr = XLSX.utils.encode_cell({ r, c: 3 })
-    const horaAddr  = XLSX.utils.encode_cell({ r, c: 4 })
-    if (!ws[fechaAddr]) ws[fechaAddr] = { t: 's', v: '' }
-    ws[fechaAddr].z = '@'  // format code '@' = texto
-    if (!ws[horaAddr])  ws[horaAddr]  = { t: 's', v: '' }
-    ws[horaAddr].z  = '@'
+  // Pre-formatear fecha (col D) y hora (col E) filas 2-51 como Texto
+  // para que Excel no convierta DD/MM/AAAA según configuración regional
+  for (let r = 1; r < 51; r++) {
+    const fa = XLSX.utils.encode_cell({ r, c: 3 })
+    const ha = XLSX.utils.encode_cell({ r, c: 4 })
+    if (!wsPartidos[fa]) wsPartidos[fa] = { t: 's', v: '' }
+    wsPartidos[fa].z = '@'
+    if (!wsPartidos[ha]) wsPartidos[ha] = { t: 's', v: '' }
+    wsPartidos[ha].z = '@'
   }
-
-  // Actualizar el rango del sheet para incluir las celdas pre-formateadas
-  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 51, c: 5 } })
-
-  // Ancho de columnas
-  ws['!cols'] = [
-    { wch: 22 }, // jornada
-    { wch: 16 }, // equipo_a
-    { wch: 16 }, // equipo_b
-    { wch: 20 }, // fecha
-    { wch: 13 }, // hora_bogota
-    { wch: 22 }, // estadio
+  wsPartidos['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 50, c: 5 } })
+  wsPartidos['!cols'] = [
+    { wch: 22 }, { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 13 }, { wch: 22 },
   ]
+  XLSX.utils.book_append_sheet(wb, wsPartidos, 'Partidos')
 
-  // Combinar instrucciones en toda la fila 1
-  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }]
+  // ── Hoja 2: Instrucciones ────────────────────────────────────────────────
+  const wsInstr = XLSX.utils.aoa_to_sheet([
+    ['Campo', 'Descripción', 'Ejemplo'],
+    ['jornada',             'Nombre exacto de la jornada creada en la polla',                         jornadaNames[0] ?? 'Jornada 1'],
+    ['equipo_a',            'Nombre del equipo local (o equipo A)',                                    'Colombia'],
+    ['equipo_b',            'Nombre del equipo visitante (o equipo B)',                                'Brasil'],
+    ['fecha (DD/MM/AAAA)',  'Fecha del partido — formato Día/Mes/Año Colombia',                        '15/06/2026'],
+    ['hora_bogota',         'Hora en Colombia. Acepta: 20:00 · 8 pm · 8:00 pm',                       '20:00'],
+    ['estadio',             'Estadio (opcional, puede dejarse vacío)',                                 'MetLife Stadium'],
+    ['', '', ''],
+    ['⚠️ IMPORTANTE', 'La columna "fecha" está pre-formateada como Texto. Escríbela como DD/MM/AAAA.', ''],
+    ['⚠️ IMPORTANTE', 'No cambies el nombre de la pestaña "Partidos" ni los encabezados de la fila 1.', ''],
+    ['⚠️ IMPORTANTE', 'Llena los datos desde la fila 2 de la pestaña "Partidos".', ''],
+  ])
+  wsInstr['!cols'] = [{ wch: 22 }, { wch: 58 }, { wch: 22 }]
+  XLSX.utils.book_append_sheet(wb, wsInstr, 'Instrucciones')
 
-  XLSX.utils.book_append_sheet(wb, ws, 'Partidos')
   XLSX.writeFile(wb, 'plantilla_partidos.xlsx')
 }
 
