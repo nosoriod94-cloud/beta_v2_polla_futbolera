@@ -11,6 +11,8 @@ import Auth from "./pages/Auth";
 import Home from "./pages/Home";
 import Admin from "./pages/Admin";
 import PollaView from "./pages/PollaView";
+import Predicciones from "./pages/Predicciones";
+import Posiciones from "./pages/Posiciones";
 import Perfil from "./pages/Perfil";
 import SuperAdmin from "./pages/SuperAdmin";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
@@ -73,6 +75,26 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <PollaView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/polla/:pollaId/predicciones"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <Predicciones />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/polla/:pollaId/posiciones"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <Posiciones />
+                  </AppLayout>
                 </ProtectedRoute>
               }
             />
