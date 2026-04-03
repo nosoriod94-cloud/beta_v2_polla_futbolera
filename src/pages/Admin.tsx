@@ -81,20 +81,31 @@ interface CsvRow {
 
 // ── Conversores de seriales Excel ────────────────────────────────────────────
 
-/** Excel guarda las horas como fracción del día (20:00 → 0.8333).
- *  Convierte ese número al string "HH:mm" que espera el validador. */
+/** Convierte cualquier formato de hora de Excel a "HH:mm" (24h).
+ *  Maneja: serial decimal (0.8333), "2 pm", "5:30 pm", "14:00", "2:00 PM". */
 function excelTimeToHHMM(val: unknown): string {
+  // Serial numérico: Excel guarda las horas como fracción del día (20:00 → 0.8333)
   if (typeof val === 'number') {
-    const frac = val % 1  // parte fraccionaria = la hora
+    const frac = val % 1
     const totalMin = Math.round(frac * 24 * 60)
     const h = Math.floor(totalMin / 60)
     const m = totalMin % 60
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
   }
-  // Si ya es texto, normalizar "H:mm" → "HH:mm"
   const s = String(val ?? '').trim()
-  const match = s.match(/^(\d{1,2}):(\d{2})/)
-  return match ? `${match[1].padStart(2, '0')}:${match[2]}` : s
+  // Formato AM/PM: "2 pm", "5:30 pm", "2:00 PM", "2PM"
+  const ampm = s.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i)
+  if (ampm) {
+    let h = parseInt(ampm[1])
+    const m = parseInt(ampm[2] ?? '0')
+    const period = ampm[3].toLowerCase()
+    if (period === 'pm' && h !== 12) h += 12
+    if (period === 'am' && h === 12) h = 0
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  }
+  // Formato 24h: "14:00" o "2:00"
+  const hhmm = s.match(/^(\d{1,2}):(\d{2})/)
+  return hhmm ? `${hhmm[1].padStart(2, '0')}:${hhmm[2]}` : s
 }
 
 /** Excel guarda las fechas como días desde 1/1/1900.
