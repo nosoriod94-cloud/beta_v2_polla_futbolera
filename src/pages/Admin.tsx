@@ -21,6 +21,7 @@ import {
 import type { MatchResult } from '@/lib/database.types'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import * as XLSX from 'xlsx'
 
 // ─── Timezone helpers (Bogotá = UTC-5, sin cambio de horario) ───────────────
 
@@ -64,7 +65,7 @@ function formatBogota(utcStr: string): string {
   }
 }
 
-// ─── CSV helpers ─────────────────────────────────────────────────────────────
+// ─── Import helpers (Excel + CSV) ────────────────────────────────────────────
 
 interface CsvRow {
   jornada: string
@@ -78,20 +79,46 @@ interface CsvRow {
   error?: string
 }
 
-function parseCSV(text: string): CsvRow[] {
+/** Parsea un archivo Excel (.xlsx / .xls) como filas */
+function parseExcelBuffer(buffer: ArrayBuffer): CsvRow[] {
+  const wb = XLSX.read(buffer, { type: 'array', raw: false, dateNF: 'dd/mm/yyyy' })
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  const rows = XLSX.utils.sheet_to_json<string[]>(ws, {
+    header: 1,
+    raw: false,
+    dateNF: 'dd/mm/yyyy',
+    defval: '',
+  }) as string[][]
+  // Buscar la fila de encabezados (ignora filas de instrucciones)
+  const headerIdx = rows.findIndex(r =>
+    r.some(c => String(c).toLowerCase().includes('jornada'))
+  )
+  if (headerIdx === -1 || headerIdx === rows.length - 1) return []
+  return rows.slice(headerIdx + 1)
+    .filter(cols => cols.some(c => String(c).trim()))
+    .map(cols => ({
+      jornada:  String(cols[0] ?? '').trim(),
+      equipo_a: String(cols[1] ?? '').trim(),
+      equipo_b: String(cols[2] ?? '').trim(),
+      fecha:    String(cols[3] ?? '').trim(),
+      hora:     String(cols[4] ?? '').trim(),
+      estadio:  String(cols[5] ?? '').trim(),
+    }))
+}
+
+/** Parsea un archivo CSV de texto como filas */
+function parseCSVText(text: string): CsvRow[] {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'))
   if (lines.length < 2) return []
-  // Skip header row
-  const dataLines = lines.slice(1)
-  return dataLines.map(line => {
+  return lines.slice(1).map(line => {
     const cols = line.split(',').map(c => c.trim())
     return {
-      jornada: cols[0] ?? '',
+      jornada:  cols[0] ?? '',
       equipo_a: cols[1] ?? '',
       equipo_b: cols[2] ?? '',
-      fecha: cols[3] ?? '',
-      hora: cols[4] ?? '',
-      estadio: cols[5] ?? '',
+      fecha:    cols[3] ?? '',
+      hora:     cols[4] ?? '',
+      estadio:  cols[5] ?? '',
     }
   })
 }
@@ -115,27 +142,36 @@ function validateAndEnrichRows(rows: CsvRow[], jornadaNames: string[]): CsvRow[]
   })
 }
 
-function downloadTemplate() {
-  const header = 'jornada,equipo_a,equipo_b,fecha,hora_bogota,estadio'
-  const example = 'Jornada 1,Colombia,Brasil,15/06/2026,20:00,MetLife Stadium'
-  const example2 = 'Jornada 1,Argentina,México,16/06/2026,17:00,'
-  const notes = [
-    '# INSTRUCCIONES:',
-    '# - jornada: debe coincidir exactamente con el nombre de la jornada creada en la polla',
-    '# - fecha: formato dd/mm/yyyy (ej: 15/06/2026)',
-    '# - hora_bogota: hora en Colombia UTC-5, formato HH:mm (ej: 20:00)',
-    '# - estadio: opcional, puedes dejarlo vacío',
-    '# - No borres la fila de encabezados (primera fila sin #)',
-    '#',
-  ].join('\n')
-  const csv = `${notes}\n${header}\n${example}\n${example2}\n`
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'plantilla_partidos.csv'
-  a.click()
-  URL.revokeObjectURL(url)
+function downloadTemplate(jornadaNames: string[]) {
+  const wb = XLSX.utils.book_new()
+
+  const data = [
+    // Fila de instrucciones (visible al abrir el archivo)
+    ['INSTRUCCIONES: Llena desde la fila 3. La columna "jornada" debe coincidir exactamente con una jornada creada en la polla. La fecha va en formato dd/mm/aaaa y la hora en HH:mm (hora Colombia).', '', '', '', '', ''],
+    // Encabezados
+    ['jornada', 'equipo_a', 'equipo_b', 'fecha', 'hora_bogota', 'estadio'],
+    // Ejemplos
+    [jornadaNames[0] ?? 'Jornada 1', 'Colombia', 'Brasil', '15/06/2026', '20:00', 'MetLife Stadium'],
+    [jornadaNames[0] ?? 'Jornada 1', 'Argentina', 'México', '16/06/2026', '17:00', ''],
+  ]
+
+  const ws = XLSX.utils.aoa_to_sheet(data)
+
+  // Ancho de columnas
+  ws['!cols'] = [
+    { wch: 22 }, // jornada
+    { wch: 16 }, // equipo_a
+    { wch: 16 }, // equipo_b
+    { wch: 14 }, // fecha
+    { wch: 13 }, // hora_bogota
+    { wch: 22 }, // estadio
+  ]
+
+  // Combinar celda de instrucciones para que abarque todas las columnas
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }]
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Partidos')
+  XLSX.writeFile(wb, 'plantilla_partidos.xlsx')
 }
 
 // ─── Result labels ────────────────────────────────────────────────────────────
@@ -307,20 +343,30 @@ export default function Admin() {
     }
   }
 
-  function handleCSVFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    const jornadaNames = jornadas.map(j => j.nombre)
+    const isExcel = /\.(xlsx|xls)$/i.test(file.name)
     const reader = new FileReader()
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string
-      const parsed = parseCSV(text)
-      const jornadaNames = jornadas.map(j => j.nombre)
-      const validated = validateAndEnrichRows(parsed, jornadaNames)
-      setCsvRows(validated)
-      setCsvOpen(true)
+
+    if (isExcel) {
+      reader.onload = (ev) => {
+        const buffer = ev.target?.result as ArrayBuffer
+        const parsed = parseExcelBuffer(buffer)
+        setCsvRows(validateAndEnrichRows(parsed, jornadaNames))
+        setCsvOpen(true)
+      }
+      reader.readAsArrayBuffer(file)
+    } else {
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string
+        const parsed = parseCSVText(text)
+        setCsvRows(validateAndEnrichRows(parsed, jornadaNames))
+        setCsvOpen(true)
+      }
+      reader.readAsText(file)
     }
-    reader.readAsText(file)
-    // Reset input so same file can be re-selected
     e.target.value = ''
   }
 
@@ -700,8 +746,8 @@ export default function Admin() {
 
           {/* CSV import */}
           <div className="flex gap-2">
-            <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={downloadTemplate}>
-              <Download className="h-3.5 w-3.5 mr-1" /> Descargar plantilla CSV
+            <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={() => downloadTemplate(jornadas.map(j => j.nombre))}>
+              <Download className="h-3.5 w-3.5 mr-1" /> Descargar plantilla Excel
             </Button>
             <Button
               size="sm" variant="ghost"
@@ -709,14 +755,14 @@ export default function Admin() {
               disabled={jornadas.length === 0}
               onClick={() => fileInputRef.current?.click()}
             >
-              <Upload className="h-3.5 w-3.5 mr-1" /> Importar desde CSV
+              <Upload className="h-3.5 w-3.5 mr-1" /> Importar Excel / CSV
             </Button>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,text/csv"
+              accept=".xlsx,.xls,.csv"
               className="hidden"
-              onChange={handleCSVFile}
+              onChange={handleImportFile}
             />
           </div>
 
