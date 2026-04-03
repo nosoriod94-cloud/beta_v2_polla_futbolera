@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
@@ -27,11 +28,36 @@ export function useApodoAvailable(pollaId: string | undefined, apodo: string) {
   })
 }
 
-// Para uso del Admin: incluye profiles(nombre_completo) para identificar al usuario
+// Para uso del Admin: incluye profiles(nombre_completo) para identificar al usuario.
+// Se suscribe a cambios en tiempo real para que el panel se actualice automáticamente.
 export function useParticipants(pollaId: string | undefined) {
+  const qc = useQueryClient()
+
+  useEffect(() => {
+    if (!pollaId) return
+    const channel = supabase
+      .channel(`participants:${pollaId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'polla_participants',
+          filter: `polla_id=eq.${pollaId}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ['participants', pollaId] })
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [pollaId, qc])
+
   return useQuery({
     queryKey: ['participants', pollaId],
     enabled: !!pollaId,
+    // Polling cada 15s como fallback si Realtime no está disponible
+    refetchInterval: 15_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('polla_participants')
