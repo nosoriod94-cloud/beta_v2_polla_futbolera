@@ -79,30 +79,64 @@ interface CsvRow {
   error?: string
 }
 
-/** Parsea un archivo Excel (.xlsx / .xls) como filas */
+// ── Conversores de seriales Excel ────────────────────────────────────────────
+
+/** Excel guarda las horas como fracción del día (20:00 → 0.8333).
+ *  Convierte ese número al string "HH:mm" que espera el validador. */
+function excelTimeToHHMM(val: unknown): string {
+  if (typeof val === 'number') {
+    const frac = val % 1  // parte fraccionaria = la hora
+    const totalMin = Math.round(frac * 24 * 60)
+    const h = Math.floor(totalMin / 60)
+    const m = totalMin % 60
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  }
+  // Si ya es texto, normalizar "H:mm" → "HH:mm"
+  const s = String(val ?? '').trim()
+  const match = s.match(/^(\d{1,2}):(\d{2})/)
+  return match ? `${match[1].padStart(2, '0')}:${match[2]}` : s
+}
+
+/** Excel guarda las fechas como días desde 1/1/1900.
+ *  Convierte ese número a "dd/mm/yyyy". */
+function excelDateToDDMMYYYY(val: unknown): string {
+  if (typeof val === 'number' && val > 1) {
+    const d = new Date(Math.round((val - 25569) * 86400 * 1000))
+    const dd = String(d.getUTCDate()).padStart(2, '0')
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+    const yyyy = d.getUTCFullYear()
+    return `${dd}/${mm}/${yyyy}`
+  }
+  return String(val ?? '').trim()
+}
+
+/** Parsea un archivo Excel (.xlsx / .xls) como filas.
+ *  Usa raw:true para recibir los valores numéricos de Excel y convertirlos
+ *  correctamente en lugar de depender del formato de celda del archivo. */
 function parseExcelBuffer(buffer: ArrayBuffer): CsvRow[] {
-  const wb = XLSX.read(buffer, { type: 'array', raw: false, dateNF: 'dd/mm/yyyy' })
+  const wb = XLSX.read(buffer, { type: 'array' })
   const ws = wb.Sheets[wb.SheetNames[0]]
-  const rows = XLSX.utils.sheet_to_json<string[]>(ws, {
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, {
     header: 1,
-    raw: false,
-    dateNF: 'dd/mm/yyyy',
+    raw: true,   // valores crudos: números para fecha/hora, strings para texto
     defval: '',
-  }) as string[][]
-  // Buscar la fila de encabezados (ignora filas de instrucciones)
+  }) as unknown[][]
+
+  // Encontrar la fila de encabezados (ignora instrucciones al inicio)
   const headerIdx = rows.findIndex(r =>
-    r.some(c => String(c).toLowerCase().includes('jornada'))
+    (r as unknown[]).some(c => String(c).toLowerCase().includes('jornada'))
   )
-  if (headerIdx === -1 || headerIdx === rows.length - 1) return []
+  if (headerIdx === -1 || headerIdx >= rows.length - 1) return []
+
   return rows.slice(headerIdx + 1)
-    .filter(cols => cols.some(c => String(c).trim()))
+    .filter(cols => (cols as unknown[]).some(c => String(c).trim()))
     .map(cols => ({
-      jornada:  String(cols[0] ?? '').trim(),
-      equipo_a: String(cols[1] ?? '').trim(),
-      equipo_b: String(cols[2] ?? '').trim(),
-      fecha:    String(cols[3] ?? '').trim(),
-      hora:     String(cols[4] ?? '').trim(),
-      estadio:  String(cols[5] ?? '').trim(),
+      jornada:  String((cols as unknown[])[0] ?? '').trim(),
+      equipo_a: String((cols as unknown[])[1] ?? '').trim(),
+      equipo_b: String((cols as unknown[])[2] ?? '').trim(),
+      fecha:    excelDateToDDMMYYYY((cols as unknown[])[3]),
+      hora:     excelTimeToHHMM((cols as unknown[])[4]),
+      estadio:  String((cols as unknown[])[5] ?? '').trim(),
     }))
 }
 
