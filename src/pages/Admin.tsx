@@ -14,14 +14,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
+import { getReadableError } from '@/lib/errorMessages'
 import {
   ArrowLeft, Plus, Download, Lock, Unlock, CheckCircle, XCircle, Clock,
   Pencil, Trash2, Copy, Users, AlertTriangle, Upload, Check, X, RefreshCw,
+  Calendar, FileDown,
 } from 'lucide-react'
 import type { MatchResult } from '@/lib/database.types'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 
 // ─── Timezone helpers (Bogotá = UTC-5, sin cambio de horario) ───────────────
 
@@ -82,8 +84,14 @@ interface CsvRow {
 // ── Conversores de seriales Excel ────────────────────────────────────────────
 
 /** Convierte cualquier formato de hora de Excel a "HH:mm" (24h).
- *  Maneja: serial decimal (0.8333), "2 pm", "5:30 pm", "14:00", "2:00 PM". */
+ *  Maneja: Date (ExcelJS), serial decimal (0.8333), "2 pm", "5:30 pm", "14:00", "2:00 PM". */
 function excelTimeToHHMM(val: unknown): string {
+  // ExcelJS devuelve Date para celdas de tiempo
+  if (val instanceof Date) {
+    const h = val.getUTCHours()
+    const m = val.getUTCMinutes()
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  }
   // Serial numérico: Excel guarda las horas como fracción del día (20:00 → 0.8333)
   if (typeof val === 'number') {
     const frac = val % 1
@@ -108,9 +116,16 @@ function excelTimeToHHMM(val: unknown): string {
   return hhmm ? `${hhmm[1].padStart(2, '0')}:${hhmm[2]}` : s
 }
 
-/** Excel guarda las fechas como días desde 1/1/1900.
- *  Convierte ese número a "dd/mm/yyyy". */
+/** Convierte fecha a "dd/mm/yyyy".
+ *  Maneja: Date (ExcelJS), serial numérico (SheetJS), o string. */
 function excelDateToDDMMYYYY(val: unknown): string {
+  // ExcelJS devuelve Date para celdas de fecha
+  if (val instanceof Date) {
+    const dd = String(val.getUTCDate()).padStart(2, '0')
+    const mm = String(val.getUTCMonth() + 1).padStart(2, '0')
+    const yyyy = val.getUTCFullYear()
+    return `${dd}/${mm}/${yyyy}`
+  }
   if (typeof val === 'number' && val > 1) {
     const d = new Date(Math.round((val - 25569) * 86400 * 1000))
     const dd = String(d.getUTCDate()).padStart(2, '0')
@@ -121,31 +136,32 @@ function excelDateToDDMMYYYY(val: unknown): string {
   return String(val ?? '').trim()
 }
 
-/** Parsea un archivo Excel (.xlsx / .xls) como filas.
- *  Usa raw:true para recibir los valores numéricos de Excel y convertirlos
- *  correctamente en lugar de depender del formato de celda del archivo. */
-function parseExcelBuffer(buffer: ArrayBuffer): CsvRow[] {
-  const wb = XLSX.read(buffer, { type: 'array' })
+/** Parsea un archivo Excel (.xlsx / .xls) como filas usando ExcelJS. */
+async function parseExcelBuffer(buffer: ArrayBuffer): Promise<CsvRow[]> {
+  const wb = new ExcelJS.Workbook()
+  await wb.xlsx.load(buffer)
   // Usar hoja "Partidos" si existe; si no, la primera hoja
-  const sheetName = wb.SheetNames.includes('Partidos') ? 'Partidos' : wb.SheetNames[0]
-  const ws = wb.Sheets[sheetName]
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, {
-    header: 1,
-    raw: true,
-    defval: '',
-  }) as unknown[][]
+  const ws = wb.getWorksheet('Partidos') ?? wb.worksheets[0]
+  if (!ws) return []
+
+  const rows: unknown[][] = []
+  ws.eachRow((row) => {
+    // ExcelJS: row.values es 1-indexado (values[0] = undefined)
+    const vals = (row.values as unknown[]).slice(1)
+    rows.push(vals)
+  })
 
   // Fila 0 = encabezados, datos desde fila 1
   if (rows.length < 2) return []
   return rows.slice(1)
-    .filter(cols => (cols as unknown[]).some(c => String(c).trim()))
+    .filter(cols => cols.some(c => String(c ?? '').trim()))
     .map(cols => ({
-      jornada:  String((cols as unknown[])[0] ?? '').trim(),
-      equipo_a: String((cols as unknown[])[1] ?? '').trim(),
-      equipo_b: String((cols as unknown[])[2] ?? '').trim(),
-      fecha:    excelDateToDDMMYYYY((cols as unknown[])[3]),
-      hora:     excelTimeToHHMM((cols as unknown[])[4]),
-      estadio:  String((cols as unknown[])[5] ?? '').trim(),
+      jornada:  String(cols[0] ?? '').trim(),
+      equipo_a: String(cols[1] ?? '').trim(),
+      equipo_b: String(cols[2] ?? '').trim(),
+      fecha:    excelDateToDDMMYYYY(cols[3]),
+      hora:     excelTimeToHHMM(cols[4]),
+      estadio:  String(cols[5] ?? '').trim(),
     }))
 }
 
@@ -185,50 +201,57 @@ function validateAndEnrichRows(rows: CsvRow[], jornadaNames: string[]): CsvRow[]
   })
 }
 
-function downloadTemplate(jornadaNames: string[]) {
-  const wb = XLSX.utils.book_new()
+async function downloadTemplate(jornadaNames: string[]) {
+  const wb = new ExcelJS.Workbook()
 
   // ── Hoja 1: Partidos (limpia — solo encabezados + ejemplos) ──────────────
-  const wsPartidos = XLSX.utils.aoa_to_sheet([
-    ['jornada', 'equipo_a', 'equipo_b', 'fecha (DD/MM/AAAA)', 'hora_bogota', 'estadio'],
-    [jornadaNames[0] ?? 'Jornada 1', 'Colombia',  'Brasil',  '15/06/2026', '20:00', 'MetLife Stadium'],
-    [jornadaNames[0] ?? 'Jornada 1', 'Argentina', 'México',  '16/06/2026', '17:00', ''],
-  ])
-
-  // Pre-formatear fecha (col D) y hora (col E) filas 2-51 como Texto
-  // para que Excel no convierta DD/MM/AAAA según configuración regional
-  for (let r = 1; r < 51; r++) {
-    const fa = XLSX.utils.encode_cell({ r, c: 3 })
-    const ha = XLSX.utils.encode_cell({ r, c: 4 })
-    if (!wsPartidos[fa]) wsPartidos[fa] = { t: 's', v: '' }
-    wsPartidos[fa].z = '@'
-    if (!wsPartidos[ha]) wsPartidos[ha] = { t: 's', v: '' }
-    wsPartidos[ha].z = '@'
-  }
-  wsPartidos['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 50, c: 5 } })
-  wsPartidos['!cols'] = [
-    { wch: 22 }, { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 13 }, { wch: 22 },
+  const wsPartidos = wb.addWorksheet('Partidos')
+  wsPartidos.columns = [
+    { header: 'jornada',            width: 22 },
+    { header: 'equipo_a',           width: 16 },
+    { header: 'equipo_b',           width: 16 },
+    { header: 'fecha (DD/MM/AAAA)', width: 20 },
+    { header: 'hora_bogota',        width: 13 },
+    { header: 'estadio',            width: 22 },
   ]
-  XLSX.utils.book_append_sheet(wb, wsPartidos, 'Partidos')
+  wsPartidos.addRow([jornadaNames[0] ?? 'Jornada 1', 'Colombia',  'Brasil',  '15/06/2026', '20:00', 'MetLife Stadium'])
+  wsPartidos.addRow([jornadaNames[0] ?? 'Jornada 1', 'Argentina', 'México',  '16/06/2026', '17:00', ''])
+
+  // Pre-formatear fecha (col 4) y hora (col 5) filas 2-51 como Texto
+  for (let r = 2; r <= 51; r++) {
+    wsPartidos.getCell(r, 4).numFmt = '@'
+    wsPartidos.getCell(r, 5).numFmt = '@'
+  }
 
   // ── Hoja 2: Instrucciones ────────────────────────────────────────────────
-  const wsInstr = XLSX.utils.aoa_to_sheet([
-    ['Campo', 'Descripción', 'Ejemplo'],
-    ['jornada',             'Nombre exacto de la jornada creada en la polla',                         jornadaNames[0] ?? 'Jornada 1'],
-    ['equipo_a',            'Nombre del equipo local (o equipo A)',                                    'Colombia'],
-    ['equipo_b',            'Nombre del equipo visitante (o equipo B)',                                'Brasil'],
-    ['fecha (DD/MM/AAAA)',  'Fecha del partido — formato Día/Mes/Año Colombia',                        '15/06/2026'],
-    ['hora_bogota',         'Hora en Colombia. Acepta: 20:00 · 8 pm · 8:00 pm',                       '20:00'],
-    ['estadio',             'Estadio (opcional, puede dejarse vacío)',                                 'MetLife Stadium'],
+  const wsInstr = wb.addWorksheet('Instrucciones')
+  wsInstr.columns = [
+    { header: 'Campo',       width: 22 },
+    { header: 'Descripción', width: 58 },
+    { header: 'Ejemplo',     width: 22 },
+  ]
+  const instrRows = [
+    ['jornada',            'Nombre exacto de la jornada creada en la polla',                        jornadaNames[0] ?? 'Jornada 1'],
+    ['equipo_a',           'Nombre del equipo local (o equipo A)',                                   'Colombia'],
+    ['equipo_b',           'Nombre del equipo visitante (o equipo B)',                               'Brasil'],
+    ['fecha (DD/MM/AAAA)', 'Fecha del partido — formato Día/Mes/Año Colombia',                       '15/06/2026'],
+    ['hora_bogota',        'Hora en Colombia. Acepta: 20:00 · 8 pm · 8:00 pm',                      '20:00'],
+    ['estadio',            'Estadio (opcional, puede dejarse vacío)',                                'MetLife Stadium'],
     ['', '', ''],
     ['⚠️ IMPORTANTE', 'La columna "fecha" está pre-formateada como Texto. Escríbela como DD/MM/AAAA.', ''],
     ['⚠️ IMPORTANTE', 'No cambies el nombre de la pestaña "Partidos" ni los encabezados de la fila 1.', ''],
     ['⚠️ IMPORTANTE', 'Llena los datos desde la fila 2 de la pestaña "Partidos".', ''],
-  ])
-  wsInstr['!cols'] = [{ wch: 22 }, { wch: 58 }, { wch: 22 }]
-  XLSX.utils.book_append_sheet(wb, wsInstr, 'Instrucciones')
+  ]
+  instrRows.forEach(row => wsInstr.addRow(row))
 
-  XLSX.writeFile(wb, 'plantilla_partidos.xlsx')
+  const buffer = await wb.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'plantilla_partidos.xlsx'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ─── Result labels ────────────────────────────────────────────────────────────
@@ -317,7 +340,7 @@ export default function Admin() {
       setJornadaNombre('')
       setJornadaPuntos(3)
     } catch (err: unknown) {
-      toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error', description: getReadableError(err), variant: 'destructive' })
     }
   }
 
@@ -327,7 +350,7 @@ export default function Admin() {
       toast({ title: 'Puntos actualizados' })
       setEditingJornadaId(null)
     } catch (err: unknown) {
-      toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error', description: getReadableError(err), variant: 'destructive' })
     }
   }
 
@@ -350,7 +373,7 @@ export default function Admin() {
       setMatchFechaHora('')
       setMatchEstadio('')
     } catch (err: unknown) {
-      toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error', description: getReadableError(err), variant: 'destructive' })
     }
   }
 
@@ -374,7 +397,7 @@ export default function Admin() {
       setEditOpen(false)
       setEditMatch(null)
     } catch (err: unknown) {
-      toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error', description: getReadableError(err), variant: 'destructive' })
     }
   }
 
@@ -386,7 +409,7 @@ export default function Admin() {
         updates: { is_unlocked: !match.is_unlocked },
       })
     } catch (err: unknown) {
-      toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error', description: getReadableError(err), variant: 'destructive' })
     }
   }
 
@@ -396,7 +419,7 @@ export default function Admin() {
       await deleteMatch.mutateAsync({ matchId, pollaId: pollaId! })
       toast({ title: 'Partido eliminado' })
     } catch (err: unknown) {
-      toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error', description: getReadableError(err), variant: 'destructive' })
     }
   }
 
@@ -408,9 +431,9 @@ export default function Admin() {
     const reader = new FileReader()
 
     if (isExcel) {
-      reader.onload = (ev) => {
+      reader.onload = async (ev) => {
         const buffer = ev.target?.result as ArrayBuffer
-        const parsed = parseExcelBuffer(buffer)
+        const parsed = await parseExcelBuffer(buffer)
         setCsvRows(validateAndEnrichRows(parsed, jornadaNames))
         setCsvOpen(true)
       }
@@ -513,14 +536,29 @@ export default function Admin() {
       toast({ title: 'Solicitud enviada', description: 'El administrador del sistema revisará tu solicitud.' })
       setLimitOpen(false)
     } catch (err: unknown) {
-      toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error', description: getReadableError(err), variant: 'destructive' })
     }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (loadingPolla) {
-    return <div className="p-8 text-center text-muted-foreground">Cargando...</div>
+    return (
+      <div className="p-4 space-y-4">
+        <div className="flex items-center gap-3 pt-4">
+          <div className="w-9 h-9 rounded-xl bg-muted/40 animate-pulse" />
+          <div className="space-y-1.5 flex-1">
+            <div className="h-5 w-40 rounded-lg bg-muted/40 animate-pulse" />
+            <div className="h-3 w-24 rounded-lg bg-muted/30 animate-pulse" />
+          </div>
+        </div>
+        <div className="h-16 rounded-2xl bg-muted/30 animate-pulse" />
+        <div className="h-10 rounded-xl bg-muted/30 animate-pulse" />
+        {[0,1,2].map(i => (
+          <div key={i} className="h-14 rounded-xl bg-muted/20 animate-pulse" style={{ animationDelay: `${i * 80}ms` }} />
+        ))}
+      </div>
+    )
   }
 
   const validCsvCount = csvRows.filter(r => !r.error).length
@@ -553,11 +591,32 @@ export default function Admin() {
         </CardContent>
       </Card>
 
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: 'Participantes', value: authorizedCount, icon: Users, color: 'text-sky-400' },
+          { label: 'Partidos', value: matches.length, icon: Calendar, color: 'text-primary' },
+          { label: 'Jornadas', value: jornadas.length, icon: FileDown, color: 'text-purple-400' },
+        ].map(({ label, value, icon: Icon, color }) => (
+          <div key={label} className="rounded-2xl border border-border/50 bg-card/60 px-3 py-2.5 text-center">
+            <Icon className={`h-4 w-4 mx-auto mb-1 ${color}`} />
+            <p className="font-display text-xl leading-none" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>{value}</p>
+            <p className="text-[10px] text-muted-foreground/60 mt-0.5">{label}</p>
+          </div>
+        ))}
+      </div>
+
       <Tabs defaultValue="participantes">
         <TabsList className="w-full">
-          <TabsTrigger value="participantes" className="flex-1 text-xs">Participantes</TabsTrigger>
-          <TabsTrigger value="partidos" className="flex-1 text-xs">Partidos</TabsTrigger>
-          <TabsTrigger value="exportar" className="flex-1 text-xs">Exportar</TabsTrigger>
+          <TabsTrigger value="participantes" className="flex-1 text-xs flex items-center gap-1.5">
+            <Users className="h-3.5 w-3.5" /> Participantes
+          </TabsTrigger>
+          <TabsTrigger value="partidos" className="flex-1 text-xs flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5" /> Partidos
+          </TabsTrigger>
+          <TabsTrigger value="exportar" className="flex-1 text-xs flex items-center gap-1.5">
+            <FileDown className="h-3.5 w-3.5" /> Exportar
+          </TabsTrigger>
         </TabsList>
 
         {/* ===== PARTICIPANTES ===== */}
@@ -634,7 +693,13 @@ export default function Admin() {
             </div>
           )}
 
-          {participants.length === 0 ? (
+          {fetchingParticipants && participants.length === 0 ? (
+            <div className="space-y-2">
+              {[0,1,2].map(i => (
+                <div key={i} className="h-14 rounded-xl bg-muted/20 animate-pulse" style={{ animationDelay: `${i * 80}ms` }} />
+              ))}
+            </div>
+          ) : participants.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-8 text-center text-muted-foreground text-sm">
                 Nadie se ha unido todavía. Comparte el código de invitación.

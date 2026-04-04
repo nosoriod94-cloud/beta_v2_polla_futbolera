@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
+import { getReadableError } from '@/lib/errorMessages'
+import { Logo } from '@/components/Logo'
 
 export default function Auth() {
   const { signIn, signUp } = useAuth()
@@ -30,7 +32,7 @@ export default function Auth() {
     const { error } = await signIn(loginEmail, loginPassword)
     setLoading(false)
     if (error) {
-      toast({ title: 'Error al ingresar', description: error.message, variant: 'destructive' })
+      toast({ title: 'Error al ingresar', description: getReadableError(error), variant: 'destructive' })
     } else {
       navigate('/')
     }
@@ -58,19 +60,26 @@ export default function Auth() {
     const { error } = await signUp(regEmail, regPassword, regNombre.trim())
     setLoading(false)
     if (error) {
-      toast({ title: 'Error al registrarse', description: error.message, variant: 'destructive' })
+      toast({ title: 'Error al registrarse', description: getReadableError(error), variant: 'destructive' })
     } else {
       toast({ title: 'Cuenta creada', description: 'Revisa tu correo para confirmar tu cuenta.' })
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-slate-900 to-emerald-950 p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-2">⚽</div>
-          <h1 className="text-3xl font-bold text-white">Polla Mundialista</h1>
-          <p className="text-blue-200 mt-1">FIFA 2026</p>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4"
+      style={{ background: 'radial-gradient(ellipse 80% 60% at 50% -10%, hsl(154 100% 45% / 0.12) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 80% 100%, hsl(199 90% 52% / 0.08) 0%, transparent 60%), hsl(222 22% 5%)' }}
+    >
+      {/* Decorative grid lines */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
+        style={{ backgroundImage: 'linear-gradient(hsl(154 100% 45%) 1px, transparent 1px), linear-gradient(90deg, hsl(154 100% 45%) 1px, transparent 1px)', backgroundSize: '48px 48px' }}
+      />
+      <div className="w-full max-w-md relative z-10">
+        <div className="text-center mb-8 animate-fade-up">
+          <Logo size="lg" variant="full" className="justify-center mb-3" />
+          <p className="text-muted-foreground text-sm tracking-widest uppercase" style={{ fontFamily: "'DM Sans', sans-serif", letterSpacing: '0.15em' }}>
+            FIFA 2026 · Predice · Compite · Gana
+          </p>
         </div>
 
         <Card className="shadow-2xl">

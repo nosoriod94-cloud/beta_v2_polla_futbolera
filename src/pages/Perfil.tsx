@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
+import { getReadableError } from '@/lib/errorMessages'
 import { User, LogOut } from 'lucide-react'
 
 export default function Perfil() {
@@ -36,7 +37,7 @@ export default function Perfil() {
       .eq('user_id', user.id)
     setSaving(false)
     if (error) {
-      toast({ title: 'Error al guardar', description: error.message, variant: 'destructive' })
+      toast({ title: 'Error al guardar', description: getReadableError(error), variant: 'destructive' })
     } else {
       toast({ title: 'Perfil actualizado' })
     }

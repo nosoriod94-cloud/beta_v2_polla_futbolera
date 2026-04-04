@@ -9,11 +9,10 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
+import { getReadableError } from '@/lib/errorMessages'
 import { Plus, CheckCircle, Shield, LogOut, ToggleLeft, ToggleRight, Users, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-
-const SUPERADMIN_EMAIL = import.meta.env.VITE_SUPERADMIN_EMAIL
 
 export default function SuperAdmin() {
   const { user, signOut } = useAuth()
@@ -25,17 +24,32 @@ export default function SuperAdmin() {
   const [generatedCode, setGeneratedCode] = useState<string | null>(null)
   const [codeCopied, setCodeCopied] = useState(false)
 
-  const { data: licenses = [], isLoading: loadingLicenses } = useAllLicenses()
+  const { data: licenses = [], isLoading: loadingLicenses, isError: errorLicenses } = useAllLicenses()
   const { data: allPollas = [], isLoading: loadingPollas } = useAllPollas()
   const { data: pendingRequests = [] } = usePendingLimitRequests()
   const grantLicense = useGrantLicense()
   const toggleActive = useToggleLicenseActive()
   const resolveRequest = useResolveLimitRequest()
 
-  // Bloquear si no es superadmin (la protección real está en las RPCs de Supabase)
-  if (!user || !SUPERADMIN_EMAIL || user.email !== SUPERADMIN_EMAIL) {
+  // Si no hay sesión, redirigir al login
+  if (!user) {
     navigate('/superadmin/login', { replace: true })
     return null
+  }
+
+  // Si las licencias fallaron (no es superadmin), redirigir
+  if (!loadingLicenses && errorLicenses) {
+    navigate('/superadmin/login', { replace: true })
+    return null
+  }
+
+  // Mostrar spinner mientras se verifica
+  if (loadingLicenses) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+        <p className="text-slate-400 text-sm">Verificando acceso...</p>
+      </div>
+    )
   }
 
   async function handleGrant(e: React.FormEvent) {
@@ -50,7 +64,7 @@ export default function SuperAdmin() {
       setClientEmail('')
       setClienteNombre('')
     } catch (err: unknown) {
-      toast({ title: 'Error al otorgar licencia', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error al otorgar licencia', description: getReadableError(err), variant: 'destructive' })
     }
   }
 
@@ -69,7 +83,7 @@ export default function SuperAdmin() {
         description: `${email} ${currentActive ? 'ya no puede acceder' : 'puede acceder nuevamente'}.`,
       })
     } catch (err: unknown) {
-      toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error', description: getReadableError(err), variant: 'destructive' })
     }
   }
 
@@ -81,7 +95,7 @@ export default function SuperAdmin() {
         description: status === 'approved' ? 'El admin ya puede agregar más participantes.' : 'La solicitud fue rechazada.',
       })
     } catch (err: unknown) {
-      toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error', description: getReadableError(err), variant: 'destructive' })
     }
   }
 

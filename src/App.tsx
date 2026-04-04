@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
+import { useEffect, useRef } from "react";
 
 import Auth from "./pages/Auth";
 import Home from "./pages/Home";
@@ -30,6 +31,25 @@ const queryClient = new QueryClient({
   },
 });
 
+function PageTransition({ children }: { children: React.ReactNode }) {
+  const location = useLocation()
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.opacity = '0'
+    el.style.transform = 'translateY(8px)'
+    requestAnimationFrame(() => {
+      el.style.transition = 'opacity 220ms ease, transform 220ms ease'
+      el.style.opacity = '1'
+      el.style.transform = 'translateY(0)'
+    })
+  }, [location.pathname])
+
+  return <div ref={ref}>{children}</div>
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -47,7 +67,7 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AppLayout>
-                    <Home />
+                    <PageTransition><Home /></PageTransition>
                   </AppLayout>
                 </ProtectedRoute>
               }
@@ -57,7 +77,7 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AppLayout>
-                    <Perfil />
+                    <PageTransition><Perfil /></PageTransition>
                   </AppLayout>
                 </ProtectedRoute>
               }
@@ -83,7 +103,7 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AppLayout>
-                    <Predicciones />
+                    <PageTransition><Predicciones /></PageTransition>
                   </AppLayout>
                 </ProtectedRoute>
               }
@@ -93,7 +113,7 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AppLayout>
-                    <Posiciones />
+                    <PageTransition><Posiciones /></PageTransition>
                   </AppLayout>
                 </ProtectedRoute>
               }

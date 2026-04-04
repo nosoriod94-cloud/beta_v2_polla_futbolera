@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
+import { getReadableError } from '@/lib/errorMessages'
 import {
   Plus, Shield, Users, Clock, Lock, AlertTriangle,
   LogOut, Briefcase, ChevronRight, ArrowLeft, Pencil, Check, X,
@@ -71,7 +72,7 @@ function LicenseWorkspace({
       setNewPollaName('')
       navigate(`/admin/${polla.id}`)
     } catch (err: unknown) {
-      toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error', description: getReadableError(err), variant: 'destructive' })
     }
   }
 
@@ -373,7 +374,7 @@ export default function ClientAdmin() {
     try {
       await setLicenseNombre.mutateAsync({ licenseId, nombre })
     } catch (err: unknown) {
-      toast({ title: 'Error al renombrar', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error al renombrar', description: getReadableError(err), variant: 'destructive' })
     }
   }
 
@@ -387,7 +388,7 @@ export default function ClientAdmin() {
       setJoinCode('')
       setJoinApodo('')
     } catch (err: unknown) {
-      toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error', description: getReadableError(err), variant: 'destructive' })
     }
   }
 

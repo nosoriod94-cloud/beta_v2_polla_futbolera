@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
+import { getReadableError } from '@/lib/errorMessages'
 import { KeyRound, ArrowRight, User } from 'lucide-react'
 
 export default function ClientAdminRegister() {
@@ -33,7 +34,7 @@ export default function ClientAdminRegister() {
       setLicenseEmail(result.email)
       setStep(2)
     } catch (err: unknown) {
-      toast({ title: 'Código inválido', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Código inválido', description: getReadableError(err), variant: 'destructive' })
     }
   }
 
@@ -67,7 +68,7 @@ export default function ClientAdminRegister() {
     setLoading(false)
 
     if (error) {
-      toast({ title: 'Error al crear la cuenta', description: error.message, variant: 'destructive' })
+      toast({ title: 'Error al crear la cuenta', description: getReadableError(error), variant: 'destructive' })
     } else {
       toast({
         title: '¡Cuenta creada!',

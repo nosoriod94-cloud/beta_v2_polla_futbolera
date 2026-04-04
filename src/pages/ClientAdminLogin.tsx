@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
+import { getReadableError } from '@/lib/errorMessages'
 import { Briefcase } from 'lucide-react'
 
 export default function ClientAdminLogin() {
@@ -29,7 +30,7 @@ export default function ClientAdminLogin() {
     setLoading(false)
 
     if (error) {
-      toast({ title: 'Error al ingresar', description: error.message, variant: 'destructive' })
+      toast({ title: 'Error al ingresar', description: getReadableError(error), variant: 'destructive' })
       return
     }
 

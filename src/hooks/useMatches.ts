@@ -150,6 +150,7 @@ export function useUpdateMatch() {
         .from('matches')
         .update(updates)
         .eq('id', matchId)
+        .eq('polla_id', pollaId)
       if (error) throw error
     },
     onSuccess: (_data, { matchId, pollaId, updates }) => {

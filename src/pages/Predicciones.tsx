@@ -4,73 +4,151 @@ import { useJornadas, useMatches } from '@/hooks/useMatches'
 import { useMyParticipant } from '@/hooks/useParticipants'
 import { useMyPredictions, useUpsertPrediction } from '@/hooks/usePredictions'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { Lock, Clock, CheckCircle2 } from 'lucide-react'
+import { getReadableError } from '@/lib/errorMessages'
+import { Lock, Clock, CheckCircle2, Zap } from 'lucide-react'
 import { format, isPast, addMinutes } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import type { Pick } from '@/lib/database.types'
+import { useState, useCallback } from 'react'
 
 interface PredictionToggleProps {
   matchId: string
   pollaId: string
   participantId: string
   currentPick: Pick | undefined
+  resultado: Pick | null | undefined
   equipoA: string
   equipoB: string
   disabled: boolean
+  puntosPorAcierto: number
 }
 
-function PredictionToggle({ matchId, pollaId, participantId, currentPick, equipoA, equipoB, disabled }: PredictionToggleProps) {
+const PICK_CONFIG = {
+  A_wins: {
+    color: 'emerald',
+    activeBg: 'bg-emerald-500',
+    activeBorder: 'border-emerald-400',
+    activeShadow: 'shadow-emerald-500/40',
+    inactiveBorder: 'border-border',
+    hoverBorder: 'hover:border-emerald-500/60',
+    hoverBg: 'hover:bg-emerald-500/8',
+    glow: '0 0 20px hsl(142 76% 50% / 0.45)',
+    ring: 'hsl(142 76% 50%)',
+  },
+  draw: {
+    color: 'amber',
+    activeBg: 'bg-amber-500',
+    activeBorder: 'border-amber-400',
+    activeShadow: 'shadow-amber-500/40',
+    inactiveBorder: 'border-border',
+    hoverBorder: 'hover:border-amber-500/60',
+    hoverBg: 'hover:bg-amber-500/8',
+    glow: '0 0 20px hsl(38 92% 55% / 0.45)',
+    ring: 'hsl(38 92% 55%)',
+  },
+  B_wins: {
+    color: 'sky',
+    activeBg: 'bg-sky-500',
+    activeBorder: 'border-sky-400',
+    activeShadow: 'shadow-sky-500/40',
+    inactiveBorder: 'border-border',
+    hoverBorder: 'hover:border-sky-500/60',
+    hoverBg: 'hover:bg-sky-500/8',
+    glow: '0 0 20px hsl(199 89% 52% / 0.45)',
+    ring: 'hsl(199 89% 52%)',
+  },
+} as const
+
+function PredictionToggle({
+  matchId, pollaId, participantId, currentPick, resultado,
+  equipoA, equipoB, disabled, puntosPorAcierto,
+}: PredictionToggleProps) {
   const upsert = useUpsertPrediction()
   const { toast } = useToast()
+  const [justPicked, setJustPicked] = useState<Pick | null>(null)
 
-  async function pick(p: Pick) {
-    if (disabled) return
+  const pick = useCallback(async (p: Pick) => {
+    if (disabled || upsert.isPending || currentPick === p) return
+    setJustPicked(p)
     try {
       await upsert.mutateAsync({ pollaId, matchId, participantId, pick: p })
     } catch (err: unknown) {
-      toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' })
+      toast({ title: 'Error', description: getReadableError(err), variant: 'destructive' })
+    } finally {
+      setTimeout(() => setJustPicked(null), 400)
     }
-  }
+  }, [disabled, upsert, currentPick, pollaId, matchId, participantId, toast])
 
-  const btnBase = 'flex-1 py-2.5 px-1 rounded-xl text-xs font-bold border-2 transition-all text-center cursor-pointer select-none'
+  const isCorrect = (p: Pick) => resultado && p === resultado
+  const isWrong   = (p: Pick) => resultado && currentPick === p && p !== resultado
 
-  const options: { value: Pick; label: string; active: string; inactive: string }[] = [
-    {
-      value: 'A_wins',
-      label: equipoA,
-      active:   'border-emerald-400 bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-105',
-      inactive: 'border-border bg-muted text-foreground hover:border-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300',
-    },
-    {
-      value: 'draw',
-      label: 'Empate',
-      active:   'border-amber-400 bg-amber-500 text-white shadow-lg shadow-amber-500/30 scale-105',
-      inactive: 'border-border bg-muted text-foreground hover:border-amber-400 hover:bg-amber-500/10 hover:text-amber-300',
-    },
-    {
-      value: 'B_wins',
-      label: equipoB,
-      active:   'border-sky-400 bg-sky-500 text-white shadow-lg shadow-sky-500/30 scale-105',
-      inactive: 'border-border bg-muted text-foreground hover:border-sky-400 hover:bg-sky-500/10 hover:text-sky-300',
-    },
+  const options: { value: Pick; label: string }[] = [
+    { value: 'A_wins', label: equipoA },
+    { value: 'draw',   label: 'Empate' },
+    { value: 'B_wins', label: equipoB  },
   ]
 
   return (
-    <div className={cn('flex gap-2 mt-3', disabled && 'opacity-60 pointer-events-none')}>
-      {options.map(opt => (
-        <button
-          key={opt.value}
-          type="button"
-          className={cn(btnBase, currentPick === opt.value ? opt.active : opt.inactive)}
-          onClick={() => pick(opt.value)}
-          disabled={disabled || upsert.isPending}
-        >
-          {opt.label}
-        </button>
-      ))}
+    <div className={cn('flex gap-2 mt-3', disabled && upsert.isPending && 'opacity-70')}>
+      {options.map(opt => {
+        const cfg     = PICK_CONFIG[opt.value]
+        const isActive = currentPick === opt.value
+        const isAnim   = justPicked === opt.value
+        const correct  = isCorrect(opt.value)
+        const wrong    = isWrong(opt.value)
+
+        return (
+          <div key={opt.value} className="flex-1 relative">
+            {/* Floating "+X pts" on correct pick */}
+            {correct && isActive && (
+              <span
+                key="pts"
+                className="animate-pts-float absolute -top-1 left-1/2 -translate-x-1/2 text-xs font-display text-emerald-300 pointer-events-none whitespace-nowrap z-10"
+                style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '13px' }}
+              >
+                +{puntosPorAcierto} PTS
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={() => pick(opt.value)}
+              disabled={disabled || upsert.isPending}
+              className={cn(
+                'w-full py-3 px-1 rounded-xl text-xs font-bold border-2 transition-all duration-200',
+                'text-center cursor-pointer select-none relative overflow-hidden',
+                isAnim && 'animate-pick-pop',
+                // Active state
+                isActive && !disabled && [
+                  cfg.activeBg, cfg.activeBorder,
+                  'text-white shadow-lg', cfg.activeShadow,
+                ],
+                // Correct result
+                correct && isActive && 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-background',
+                // Wrong result
+                wrong && 'opacity-50 saturate-50',
+                // Inactive (not locked)
+                !isActive && !disabled && [
+                  'bg-muted/50', cfg.inactiveBorder, cfg.hoverBorder, cfg.hoverBg,
+                  'text-muted-foreground hover:text-foreground',
+                ],
+                // Locked state
+                disabled && isActive && 'opacity-90',
+                disabled && !isActive && 'opacity-40 cursor-not-allowed',
+              )}
+              style={isActive && !disabled ? { boxShadow: cfg.glow } : undefined}
+            >
+              {/* Result icon overlay */}
+              {correct && isActive && (
+                <CheckCircle2 className="absolute top-1 right-1 h-3 w-3 text-white/80" />
+              )}
+              <span className="block truncate leading-tight">{opt.label}</span>
+            </button>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -89,6 +167,15 @@ export default function Predicciones() {
     return (
       <div className="p-6 text-center text-muted-foreground">
         <p>No estás registrado en esta polla.</p>
+      </div>
+    )
+  }
+
+  // Defensa: verificar que el participante pertenece al usuario autenticado
+  if (participant.user_id !== user?.id) {
+    return (
+      <div className="p-6 text-center text-muted-foreground">
+        <p>No tienes permisos para ver esta página.</p>
       </div>
     )
   }
@@ -116,14 +203,23 @@ export default function Predicciones() {
   }
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 pb-24">
       {/* Header */}
-      <div className="pt-4 flex items-center justify-between">
+      <div className="pt-4 flex items-center justify-between animate-fade-up">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Mis predicciones</h1>
+          <h1 className="font-display text-3xl tracking-wide" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+            Mis predicciones
+          </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Jugando como <span className="text-primary font-semibold">{participant.apodo}</span>
+            Jugando como{' '}
+            <span className="text-primary font-semibold" style={{ textShadow: '0 0 12px hsl(154 100% 45% / 0.4)' }}>
+              {participant.apodo}
+            </span>
           </p>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 px-3 py-1.5 rounded-full border border-border/60">
+          <Zap className="h-3 w-3 text-primary" />
+          <span>Elige antes del cierre</span>
         </div>
       </div>
 
@@ -135,7 +231,7 @@ export default function Predicciones() {
         </Card>
       )}
 
-      {jornadas.map(jornada => {
+      {jornadas.map((jornada, jIdx) => {
         const jornadaMatches = matches.filter(m => m.jornada_id === jornada.id)
         const unlocked = jornadaMatches.filter(m => m.is_unlocked)
         if (unlocked.length === 0) return null
@@ -143,60 +239,75 @@ export default function Predicciones() {
         return (
           <section key={jornada.id} className="space-y-3">
             {/* Jornada header */}
-            <div className="flex items-center gap-2 px-1">
-              <h2 className="font-bold text-base">{jornada.nombre}</h2>
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30">
-                {jornada.puntos_por_acierto} pts por acierto
+            <div className="flex items-center gap-2.5 px-1" style={{ animationDelay: `${jIdx * 60}ms` }}>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent to-border/60" />
+              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">{jornada.nombre}</h2>
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-primary/15 text-primary border border-primary/25 flex items-center gap-1">
+                <Zap className="h-3 w-3" />
+                {jornada.puntos_por_acierto} pts
               </span>
+              <div className="h-px flex-1 bg-gradient-to-l from-transparent to-border/60" />
             </div>
 
-            {unlocked.map(match => {
-              const kickoff = new Date(match.fecha_hora)
-              const cutoff = addMinutes(kickoff, -1)
+            {unlocked.map((match, mIdx) => {
+              const kickoff  = new Date(match.fecha_hora)
+              const cutoff   = addMinutes(kickoff, -1)
               const isLocked = isPast(cutoff)
-              const myPick = myPredictions[match.id]?.pick
+              const myPick   = myPredictions[match.id]?.pick
               const isCorrect = myPick && match.resultado && myPick === match.resultado
+              const isDefault = myPredictions[match.id]?.is_default
 
               return (
                 <Card
                   key={match.id}
                   className={cn(
-                    'border overflow-hidden transition-all',
+                    'border overflow-hidden transition-all duration-300 animate-fade-up',
                     isLocked
-                      ? 'border-border/60 opacity-80'
-                      : 'border-border hover:border-primary/40',
-                    isCorrect && 'border-emerald-500/50'
+                      ? 'border-border/50'
+                      : 'border-border hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5',
+                    isCorrect && 'border-emerald-500/40 shadow-md shadow-emerald-500/10',
                   )}
+                  style={{ animationDelay: `${(jIdx * 100) + (mIdx * 60)}ms` }}
                 >
-                  {/* Top color stripe */}
+                  {/* Top accent stripe */}
                   <div className={cn(
-                    'h-1',
-                    isLocked ? 'bg-muted' : 'bg-gradient-to-r from-primary/60 to-secondary/60'
+                    'h-[3px]',
+                    isLocked
+                      ? 'bg-muted'
+                      : isCorrect
+                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
+                      : 'bg-gradient-to-r from-primary via-secondary to-primary/60'
                   )} />
 
-                  <CardContent className="py-3 px-4 space-y-2">
-                    {/* Teams + status */}
+                  <CardContent className="py-3 px-4 space-y-3">
+                    {/* Teams row */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold">
-                        {match.equipo_a}
-                        <span className="text-muted-foreground font-normal mx-1.5">vs</span>
-                        {match.equipo_b}
-                      </span>
+                      {/* Teams display */}
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <span className="text-sm font-bold truncate">{match.equipo_a}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground/60 shrink-0 uppercase tracking-wider">vs</span>
+                        <span className="text-sm font-bold truncate">{match.equipo_b}</span>
+                      </div>
+
+                      {/* Status badge */}
                       {isLocked ? (
-                        <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full shrink-0">
-                          <Lock className="h-3 w-3" /> Cerrado
+                        <span className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground/70 bg-muted/50 px-2 py-1 rounded-full shrink-0 border border-border/50">
+                          <Lock className="h-2.5 w-2.5" /> Cerrado
                         </span>
                       ) : (
-                        <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0">
-                          Abierto
+                        <span className="flex items-center gap-1 text-[10px] font-bold shrink-0 px-2 py-1 rounded-full border"
+                          style={{ color: 'hsl(154 100% 45%)', background: 'hsl(154 100% 45% / 0.1)', borderColor: 'hsl(154 100% 45% / 0.3)', textShadow: '0 0 8px hsl(154 100% 45% / 0.4)' }}
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
+                          ABIERTO
                         </span>
                       )}
                     </div>
 
-                    {/* Date/time */}
-                    <p className="text-xs text-muted-foreground">
-                      {format(kickoff, "d MMM yyyy, HH:mm", { locale: es })}
-                      {match.estadio && <> · {match.estadio}</>}
+                    {/* Date */}
+                    <p className="text-xs text-muted-foreground/70">
+                      {format(kickoff, "d MMM · HH:mm", { locale: es })}
+                      {match.estadio && <span className="ml-1.5 opacity-60">· {match.estadio}</span>}
                     </p>
 
                     {/* Prediction buttons */}
@@ -205,35 +316,37 @@ export default function Predicciones() {
                       pollaId={pollaId!}
                       participantId={participant.id}
                       currentPick={myPick}
+                      resultado={match.resultado}
                       equipoA={match.equipo_a}
                       equipoB={match.equipo_b}
                       disabled={isLocked}
+                      puntosPorAcierto={jornada.puntos_por_acierto}
                     />
 
-                    {/* Warnings & result */}
+                    {/* Warnings */}
                     {isLocked && !myPick && (
-                      <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-2 py-1.5 mt-1">
-                        No predijiste — quedaste con Empate por defecto.
+                      <p className="text-xs text-amber-400/80 bg-amber-500/8 border border-amber-500/15 rounded-lg px-2.5 py-1.5">
+                        Sin predicción — Empate asignado por defecto.
                       </p>
                     )}
-
-                    {myPick && myPredictions[match.id]?.is_default && (
-                      <p className="text-xs text-amber-400 mt-1">Empate asignado automáticamente.</p>
+                    {myPick && isDefault && !isLocked && (
+                      <p className="text-xs text-amber-400/70">Empate asignado automáticamente.</p>
                     )}
 
+                    {/* Result row */}
                     {match.resultado && (
-                      <div className="flex items-center gap-2 mt-1 pt-2 border-t border-border/60">
-                        <span className="text-xs text-muted-foreground">Resultado:</span>
+                      <div className="flex items-center gap-2 pt-2 border-t border-border/40">
+                        <span className="text-xs text-muted-foreground">Resultado final:</span>
                         <span className="text-xs font-bold text-foreground">
                           {match.resultado === 'A_wins' ? match.equipo_a :
                            match.resultado === 'B_wins' ? match.equipo_b : 'Empate'}
                         </span>
                         {myPick && (
                           <span className={cn(
-                            'ml-auto flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full',
+                            'ml-auto flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border',
                             myPick === match.resultado
-                              ? 'text-emerald-400 bg-emerald-500/15 border border-emerald-500/30'
-                              : 'text-muted-foreground bg-muted'
+                              ? 'text-emerald-400 bg-emerald-500/12 border-emerald-500/30 shadow-sm shadow-emerald-500/20'
+                              : 'text-muted-foreground/60 bg-muted/40 border-border/40'
                           )}>
                             {myPick === match.resultado
                               ? <><CheckCircle2 className="h-3 w-3" /> +{jornada.puntos_por_acierto} pts</>

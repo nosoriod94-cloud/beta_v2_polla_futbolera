@@ -8,8 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast'
 import { Shield } from 'lucide-react'
 
-const SUPERADMIN_EMAIL = import.meta.env.VITE_SUPERADMIN_EMAIL
-
 export default function SuperAdminLogin() {
   const { signIn, user } = useAuth()
   const navigate = useNavigate()
@@ -18,8 +16,8 @@ export default function SuperAdminLogin() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Si ya está logueado como superadmin, redirigir directo
-  if (user && SUPERADMIN_EMAIL && user.email === SUPERADMIN_EMAIL) {
+  // Si ya está logueado, redirigir (SuperAdmin.tsx verificará si es superadmin)
+  if (user) {
     navigate('/superadmin', { replace: true })
     return null
   }
@@ -27,21 +25,12 @@ export default function SuperAdminLogin() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
 
-    if (email.trim().toLowerCase() !== SUPERADMIN_EMAIL) {
-      toast({
-        title: 'Acceso denegado',
-        description: 'Este panel es exclusivo del administrador del sistema.',
-        variant: 'destructive',
-      })
-      return
-    }
-
     setLoading(true)
     const { error } = await signIn(email.trim(), password)
     setLoading(false)
 
     if (error) {
-      toast({ title: 'Contraseña incorrecta', description: error.message, variant: 'destructive' })
+      toast({ title: 'Acceso denegado', description: 'Credenciales incorrectas.', variant: 'destructive' })
       return
     }
 

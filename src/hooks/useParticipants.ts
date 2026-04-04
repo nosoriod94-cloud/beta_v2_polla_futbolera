@@ -144,6 +144,7 @@ export function useUpdateParticipantStatus() {
         .from('polla_participants')
         .update({ status })
         .eq('id', participantId)
+        .eq('polla_id', pollaId)
       if (error) throw error
     },
     onSuccess: (_data, { pollaId }) => {

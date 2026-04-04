@@ -24,11 +24,12 @@ Deno.serve(async (req) => {
 
   // Validar Bearer token para que solo el cron autorizado pueda invocar esta función
   const cronSecret = Deno.env.get('CRON_SECRET')
-  if (cronSecret) {
-    const authHeader = req.headers.get('Authorization')
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return new Response('Unauthorized', { status: 401 })
-    }
+  if (!cronSecret) {
+    return new Response('Server misconfiguration: CRON_SECRET not set', { status: 500 })
+  }
+  const authHeader = req.headers.get('Authorization')
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return new Response('Unauthorized', { status: 401 })
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey)
