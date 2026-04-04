@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useAllLicenses, useGrantLicense, useAllPollas, useToggleLicenseActive } from '@/hooks/usePollas'
 import { usePendingLimitRequests, useResolveLimitRequest } from '@/hooks/useParticipants'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,26 +31,28 @@ export default function SuperAdmin() {
   const toggleActive = useToggleLicenseActive()
   const resolveRequest = useResolveLimitRequest()
 
-  // Si no hay sesión, redirigir al login
-  if (!user) {
-    navigate('/superadmin/login', { replace: true })
-    return null
-  }
+  // Si no hay sesión → login
+  useEffect(() => {
+    if (!user) navigate('/superadmin/login', { replace: true })
+  }, [user])
 
-  // Si las licencias fallaron (no es superadmin), cerrar sesión y redirigir
-  if (!loadingLicenses && errorLicenses) {
-    signOut().then(() => navigate('/superadmin/login', { replace: true }))
-    return null
-  }
+  // Si las licencias fallaron (usuario no es superadmin) → signOut + login
+  useEffect(() => {
+    if (!loadingLicenses && errorLicenses) {
+      signOut().then(() => navigate('/superadmin/login', { replace: true }))
+    }
+  }, [loadingLicenses, errorLicenses])
 
-  // Mostrar spinner mientras se verifica
-  if (loadingLicenses) {
+  // Mostrar spinner mientras carga o verifica
+  if (!user || loadingLicenses) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
         <p className="text-slate-400 text-sm">Verificando acceso...</p>
       </div>
     )
   }
+
+  if (errorLicenses) return null
 
   async function handleGrant(e: React.FormEvent) {
     e.preventDefault()
