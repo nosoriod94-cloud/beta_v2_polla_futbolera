@@ -37,9 +37,9 @@ export default function SuperAdmin() {
     return null
   }
 
-  // Si las licencias fallaron (no es superadmin), redirigir
+  // Si las licencias fallaron (no es superadmin), cerrar sesión y redirigir
   if (!loadingLicenses && errorLicenses) {
-    navigate('/superadmin/login', { replace: true })
+    signOut().then(() => navigate('/superadmin/login', { replace: true }))
     return null
   }
 

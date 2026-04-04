@@ -16,8 +16,8 @@ export default function SuperAdminLogin() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Si ya está logueado, redirigir (SuperAdmin.tsx verificará si es superadmin)
-  if (user) {
+  // Solo redirigir si el usuario logueado es el superadmin
+  if (user?.email === 'hola@pollafutbolera.online') {
     navigate('/superadmin', { replace: true })
     return null
   }
