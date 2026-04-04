@@ -138,12 +138,9 @@ export function usePollaByInviteCode(inviteCode: string | undefined) {
     enabled: !!inviteCode && inviteCode.length >= 6,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('pollas')
-        .select('id, nombre, is_active')
-        .eq('invite_code', inviteCode!.trim().toUpperCase())
-        .maybeSingle()
+        .rpc('get_polla_by_invite_code', { p_invite_code: inviteCode!.trim().toUpperCase() })
       if (error) throw error
-      return data
+      return (data?.[0] ?? null) as { id: string; nombre: string; is_active: boolean } | null
     },
   })
 }
