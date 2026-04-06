@@ -10,13 +10,16 @@ import { useToast } from '@/hooks/use-toast'
 import { getReadableError } from '@/lib/errorMessages'
 import { Logo } from '@/components/Logo'
 
+type LoginMode = 'magic' | 'password' | 'sent'
+
 export default function Auth() {
-  const { signIn, signUp } = useAuth()
+  const { signIn, signUp, signInWithMagicLink } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [loginMode, setLoginMode] = useState<LoginMode>('magic')
 
-  // Login form
+  // Magic link / password forms
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
 
@@ -25,6 +28,18 @@ export default function Auth() {
   const [regEmail, setRegEmail] = useState('')
   const [regPassword, setRegPassword] = useState('')
   const [regPasswordConfirm, setRegPasswordConfirm] = useState('')
+
+  async function handleMagicLink(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    const { error } = await signInWithMagicLink(loginEmail)
+    setLoading(false)
+    if (error) {
+      toast({ title: 'Error al enviar link', description: getReadableError(error), variant: 'destructive' })
+    } else {
+      setLoginMode('sent')
+    }
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -93,33 +108,104 @@ export default function Auth() {
 
             <CardContent>
               <TabsContent value="login">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Correo electrónico</Label>
-                    <Input
-                      id="login-email"
-                      type="email"
-                      placeholder="tu@correo.com"
-                      value={loginEmail}
-                      onChange={e => setLoginEmail(e.target.value)}
-                      required
-                    />
+                {loginMode === 'magic' && (
+                  <form onSubmit={handleMagicLink} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="login-email">Correo electrónico</Label>
+                      <Input
+                        id="login-email"
+                        type="email"
+                        placeholder="tu@correo.com"
+                        value={loginEmail}
+                        onChange={e => setLoginEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={loading}>
+                      {loading ? 'Enviando...' : 'Enviar link de acceso'}
+                    </Button>
+                    <p className="text-center text-sm text-muted-foreground">
+                      ¿Prefieres usar contraseña?{' '}
+                      <button
+                        type="button"
+                        className="underline underline-offset-2 hover:text-foreground transition-colors"
+                        onClick={() => setLoginMode('password')}
+                      >
+                        Ingresar con clave
+                      </button>
+                    </p>
+                  </form>
+                )}
+
+                {loginMode === 'sent' && (
+                  <div className="space-y-4 text-center py-2">
+                    <p className="text-4xl">✉️</p>
+                    <div className="space-y-1">
+                      <p className="font-semibold">Revisa tu correo</p>
+                      <p className="text-sm text-muted-foreground">
+                        Enviamos un link de acceso a <span className="text-foreground font-medium">{loginEmail}</span>.
+                        Haz clic en el link para ingresar — sin contraseña.
+                      </p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      ¿No llegó?{' '}
+                      <button
+                        type="button"
+                        className="underline underline-offset-2 hover:text-foreground transition-colors"
+                        onClick={() => setLoginMode('magic')}
+                      >
+                        Reenviar
+                      </button>
+                      {' · '}
+                      <button
+                        type="button"
+                        className="underline underline-offset-2 hover:text-foreground transition-colors"
+                        onClick={() => setLoginMode('password')}
+                      >
+                        Usar contraseña
+                      </button>
+                    </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Contraseña</Label>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={loginPassword}
-                      onChange={e => setLoginPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={loading}>
-                    {loading ? 'Ingresando...' : 'Ingresar'}
-                  </Button>
-                </form>
+                )}
+
+                {loginMode === 'password' && (
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="login-email-pw">Correo electrónico</Label>
+                      <Input
+                        id="login-email-pw"
+                        type="email"
+                        placeholder="tu@correo.com"
+                        value={loginEmail}
+                        onChange={e => setLoginEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="login-password">Contraseña</Label>
+                      <Input
+                        id="login-password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={loginPassword}
+                        onChange={e => setLoginPassword(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={loading}>
+                      {loading ? 'Ingresando...' : 'Ingresar'}
+                    </Button>
+                    <p className="text-center text-sm text-muted-foreground">
+                      <button
+                        type="button"
+                        className="underline underline-offset-2 hover:text-foreground transition-colors"
+                        onClick={() => setLoginMode('magic')}
+                      >
+                        ← Ingresar con link por correo
+                      </button>
+                    </p>
+                  </form>
+                )}
               </TabsContent>
 
               <TabsContent value="register">

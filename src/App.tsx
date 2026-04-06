@@ -21,6 +21,7 @@ import ClientAdmin from "./pages/ClientAdmin";
 import ClientAdminLogin from "./pages/ClientAdminLogin";
 import ClientAdminRegister from "./pages/ClientAdminRegister";
 import NotFound from "./pages/NotFound";
+import AuthCallback from "./pages/AuthCallback";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,8 +59,9 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            {/* Pública */}
+            {/* Públicas */}
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
 
             {/* Protegidas */}
             <Route

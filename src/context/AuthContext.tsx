@@ -8,6 +8,7 @@ interface AuthContextValue {
   loading: boolean
   signUp: (email: string, password: string, nombreCompleto: string) => Promise<{ error: Error | null }>
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
+  signInWithMagicLink: (email: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
 }
 
@@ -47,12 +48,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error }
   }
 
+  async function signInWithMagicLink(email: string) {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    })
+    return { error }
+  }
+
   async function signOut() {
     await supabase.auth.signOut()
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signInWithMagicLink, signOut }}>
       {children}
     </AuthContext.Provider>
   )
