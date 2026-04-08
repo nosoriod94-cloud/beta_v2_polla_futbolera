@@ -401,6 +401,19 @@ export default function Admin() {
     }
   }
 
+  async function saveResultado(match: typeof matches[0], resultado: MatchResult) {
+    try {
+      await updateMatch.mutateAsync({
+        matchId: match.id,
+        pollaId: pollaId!,
+        updates: { resultado },
+      })
+      toast({ title: 'Resultado guardado' })
+    } catch (err: unknown) {
+      toast({ title: 'Error', description: getReadableError(err), variant: 'destructive' })
+    }
+  }
+
   async function toggleUnlock(match: typeof matches[0]) {
     try {
       await updateMatch.mutateAsync({
@@ -1029,7 +1042,33 @@ export default function Admin() {
                                 </Badge>
                               )}
                               {isPast && !match.resultado && (
-                                <span className="text-xs text-orange-600">Falta ingresar resultado</span>
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span className="text-xs text-orange-600 mr-1">Resultado:</span>
+                                  <Button
+                                    size="sm" variant="outline"
+                                    className="h-6 text-xs px-2 border-green-300 text-green-700 hover:bg-green-50"
+                                    disabled={updateMatch.isPending}
+                                    onClick={() => saveResultado(match, 'A_wins')}
+                                  >
+                                    {match.equipo_a}
+                                  </Button>
+                                  <Button
+                                    size="sm" variant="outline"
+                                    className="h-6 text-xs px-2"
+                                    disabled={updateMatch.isPending}
+                                    onClick={() => saveResultado(match, 'draw')}
+                                  >
+                                    Empate
+                                  </Button>
+                                  <Button
+                                    size="sm" variant="outline"
+                                    className="h-6 text-xs px-2 border-green-300 text-green-700 hover:bg-green-50"
+                                    disabled={updateMatch.isPending}
+                                    onClick={() => saveResultado(match, 'B_wins')}
+                                  >
+                                    {match.equipo_b}
+                                  </Button>
+                                </div>
                               )}
                             </div>
                           </CardContent>
@@ -1118,12 +1157,12 @@ export default function Admin() {
               <div className="space-y-2">
                 <Label>Resultado</Label>
                 <Select
-                  value={editMatch.resultado ?? ''}
-                  onValueChange={v => setEditMatch({ ...editMatch, resultado: (v || null) as MatchResult })}
+                  value={editMatch.resultado ?? 'sin_resultado'}
+                  onValueChange={v => setEditMatch({ ...editMatch, resultado: (v === 'sin_resultado' ? null : v) as MatchResult })}
                 >
                   <SelectTrigger><SelectValue placeholder="Sin resultado" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin resultado</SelectItem>
+                    <SelectItem value="sin_resultado">Sin resultado</SelectItem>
                     <SelectItem value="A_wins">Gana {editMatch.equipo_a}</SelectItem>
                     <SelectItem value="draw">Empate</SelectItem>
                     <SelectItem value="B_wins">Gana {editMatch.equipo_b}</SelectItem>
