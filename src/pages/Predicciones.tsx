@@ -6,7 +6,7 @@ import { useMyPredictions, useUpsertPrediction } from '@/hooks/usePredictions'
 import { Card, CardContent } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import { getReadableError } from '@/lib/errorMessages'
-import { Lock, Clock, CheckCircle2, Zap } from 'lucide-react'
+import { Lock, Clock, CheckCircle2, Zap, ChevronDown } from 'lucide-react'
 import { format, isPast, addMinutes } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -163,6 +163,18 @@ export default function Predicciones() {
   const { data: matches = [] } = useMatches(pollaId)
   const { data: myPredictions = {} } = useMyPredictions(pollaId, participant?.id)
 
+  // IDs que el usuario ha toggleado manualmente respecto a su estado natural.
+  // Estado natural: colapsado si todos los partidos ya se jugaron, expandido si no.
+  const [toggledJornadas, setToggledJornadas] = useState<Set<string>>(new Set())
+
+  const toggleJornada = (jornadaId: string) => {
+    setToggledJornadas(prev => {
+      const next = new Set(prev)
+      next.has(jornadaId) ? next.delete(jornadaId) : next.add(jornadaId)
+      return next
+    })
+  }
+
   if (!participant) {
     return (
       <div className="p-6 text-center text-muted-foreground">
@@ -236,20 +248,46 @@ export default function Predicciones() {
         const unlocked = jornadaMatches.filter(m => m.is_unlocked)
         if (unlocked.length === 0) return null
 
+        // Estado natural: colapsado si todos los partidos ya se jugaron
+        const allPast = unlocked.every(m => isPast(addMinutes(new Date(m.fecha_hora), -1)))
+        const toggled = toggledJornadas.has(jornada.id)
+        const isCollapsed = toggled ? !allPast : allPast
+
+        const pendingPicks = unlocked.filter(m => {
+          const isLocked = isPast(addMinutes(new Date(m.fecha_hora), -1))
+          return !isLocked && !myPredictions[m.id]?.pick
+        }).length
+
         return (
           <section key={jornada.id} className="space-y-3">
-            {/* Jornada header */}
-            <div className="flex items-center gap-2.5 px-1" style={{ animationDelay: `${jIdx * 60}ms` }}>
+            {/* Jornada header — clickable para colapsar */}
+            <button
+              type="button"
+              onClick={() => toggleJornada(jornada.id)}
+              className="w-full flex items-center gap-2.5 px-1 group"
+              style={{ animationDelay: `${jIdx * 60}ms` }}
+            >
               <div className="h-px flex-1 bg-gradient-to-r from-transparent to-border/60" />
-              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">{jornada.nombre}</h2>
+              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1 group-hover:text-foreground transition-colors">
+                {jornada.nombre}
+              </h2>
+              {pendingPicks > 0 && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25">
+                  {pendingPicks} sin predecir
+                </span>
+              )}
               <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-primary/15 text-primary border border-primary/25 flex items-center gap-1">
                 <Zap className="h-3 w-3" />
                 {jornada.puntos_por_acierto} pts
               </span>
+              <ChevronDown className={cn(
+                'h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200 shrink-0',
+                isCollapsed && '-rotate-90'
+              )} />
               <div className="h-px flex-1 bg-gradient-to-l from-transparent to-border/60" />
-            </div>
+            </button>
 
-            {unlocked.map((match, mIdx) => {
+            {!isCollapsed && unlocked.map((match, mIdx) => {
               const kickoff  = new Date(match.fecha_hora)
               const cutoff   = addMinutes(kickoff, -1)
               const isLocked = isPast(cutoff)
