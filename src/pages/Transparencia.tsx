@@ -1,10 +1,11 @@
+import { useState, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { useJornadas, useMatches } from '@/hooks/useMatches'
 import { usePredictions } from '@/hooks/usePredictions'
 import { useParticipantsSafe } from '@/hooks/useParticipants'
 import { EmptyState } from '@/components/EmptyState'
 import { cn } from '@/lib/utils'
-import { Eye, Lock, CheckCircle2, XCircle, Minus, Zap } from 'lucide-react'
+import { Eye, Lock, CheckCircle2, XCircle, Minus, Zap, ChevronDown } from 'lucide-react'
 import { isPast, addMinutes, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -209,20 +210,42 @@ export default function Transparencia() {
   const { data: jornadas = [] } = useJornadas(pollaId)
   const { data: matches = [] } = useMatches(pollaId)
   const { data: participants = [] } = useParticipantsSafe(pollaId)
-  const { data: predictions = [] } = usePredictions(pollaId)
+
+  // Jornadas que tienen al menos un partido cerrado
+  const jornadasConCerrados = useMemo(
+    () => jornadas.filter(j =>
+      matches
+        .filter(m => m.jornada_id === j.id)
+        .some(m => isPast(addMinutes(new Date(m.fecha_hora), -1)))
+    ),
+    [jornadas, matches],
+  )
+
+  // Estado: jornada seleccionada (por defecto la primera con partidos cerrados)
+  const [selectedJornadaId, setSelectedJornadaId] = useState<string | null>(null)
+  const activeJornada = jornadasConCerrados.find(j => j.id === selectedJornadaId)
+    ?? jornadasConCerrados[0]
+    ?? null
+
+  // Cargar predicciones solo de la jornada activa (evita traer todas las filas)
+  const { data: predictions = [] } = usePredictions(pollaId, activeJornada?.id)
 
   // Build prediction lookup: matchId → participantId → { pick, is_default }
-  const predMap: Record<string, Record<string, { pick: string; is_default: boolean }>> = {}
-  for (const pred of predictions) {
-    if (!predMap[pred.match_id]) predMap[pred.match_id] = {}
-    predMap[pred.match_id][pred.participant_id] = { pick: pred.pick, is_default: pred.is_default }
-  }
+  const predMap = useMemo(() => {
+    const map: Record<string, Record<string, { pick: string; is_default: boolean }>> = {}
+    for (const pred of predictions) {
+      if (!pred.matches) continue // filtrado por jornada — matches puede ser null
+      if (!map[pred.match_id]) map[pred.match_id] = {}
+      map[pred.match_id][pred.participant_id] = { pick: pred.pick, is_default: pred.is_default }
+    }
+    return map
+  }, [predictions])
 
-  const hasAnyClosed = jornadas.some(j =>
-    matches
-      .filter(m => m.jornada_id === j.id)
-      .some(m => isPast(addMinutes(new Date(m.fecha_hora), -1)))
-  )
+  const closedMatchesInJornada = activeJornada
+    ? matches
+        .filter(m => m.jornada_id === activeJornada.id)
+        .filter(m => isPast(addMinutes(new Date(m.fecha_hora), -1)))
+    : []
 
   return (
     <div className="p-4 space-y-6 pb-24">
@@ -247,7 +270,7 @@ export default function Transparencia() {
         </div>
       </div>
 
-      {!hasAnyClosed ? (
+      {jornadasConCerrados.length === 0 ? (
         <EmptyState
           icon={Lock}
           title="Aún no hay partidos cerrados"
@@ -255,38 +278,60 @@ export default function Transparencia() {
           size="lg"
         />
       ) : (
-        jornadas.map((jornada, jIdx) => {
-          const closedMatches = matches
-            .filter(m => m.jornada_id === jornada.id)
-            .filter(m => isPast(addMinutes(new Date(m.fecha_hora), -1)))
+        <>
+          {/* Selector de jornada */}
+          {jornadasConCerrados.length > 1 && (
+            <div className="relative">
+              <select
+                value={activeJornada?.id ?? ''}
+                onChange={e => setSelectedJornadaId(e.target.value)}
+                className="w-full appearance-none bg-card border border-border/60 rounded-xl px-4 py-2.5 text-sm font-medium pr-9 focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
+              >
+                {jornadasConCerrados.map(j => (
+                  <option key={j.id} value={j.id}>
+                    {j.nombre}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            </div>
+          )}
 
-          if (closedMatches.length === 0) return null
-
-          return (
-            <section key={jornada.id} className="space-y-3">
-              {/* Jornada header */}
-              <div className="flex items-center gap-2.5 px-1" style={{ animationDelay: `${jIdx * 60}ms` }}>
+          {/* Partidos de la jornada seleccionada */}
+          {activeJornada && (
+            <section className="space-y-3">
+              <div className="flex items-center gap-2.5 px-1">
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent to-border/60" />
-                <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">{jornada.nombre}</h2>
+                <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">
+                  {activeJornada.nombre}
+                </h2>
                 <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/25 flex items-center gap-1">
                   <Zap className="h-3 w-3" />
-                  {jornada.puntos_por_acierto} pts
+                  {activeJornada.puntos_por_acierto} pts
                 </span>
                 <div className="h-px flex-1 bg-gradient-to-l from-transparent to-border/60" />
               </div>
 
-              {closedMatches.map((match, mIdx) => (
-                <div key={match.id} style={{ animationDelay: `${(jIdx * 100) + (mIdx * 60)}ms` }}>
-                  <MatchCard
-                    match={match}
-                    participants={participants}
-                    matchPreds={predMap[match.id] ?? {}}
-                  />
-                </div>
-              ))}
+              {closedMatchesInJornada.length === 0 ? (
+                <EmptyState
+                  icon={Lock}
+                  title="Sin partidos cerrados en esta jornada"
+                  description="Selecciona otra jornada."
+                />
+              ) : (
+                closedMatchesInJornada.map((match, mIdx) => (
+                  <div key={match.id} style={{ animationDelay: `${mIdx * 60}ms` }}>
+                    <MatchCard
+                      match={match}
+                      participants={participants}
+                      matchPreds={predMap[match.id] ?? {}}
+                    />
+                  </div>
+                ))
+              )}
             </section>
-          )
-        })
+          )}
+        </>
       )}
     </div>
   )
