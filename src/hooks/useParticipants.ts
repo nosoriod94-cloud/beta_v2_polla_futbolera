@@ -111,19 +111,20 @@ export function useJoinPolla() {
   const qc = useQueryClient()
   const { user } = useAuth()
   return useMutation({
-    mutationFn: async ({ pollaId, apodo }: { pollaId: string; apodo: string }) => {
+    mutationFn: async ({ inviteCode, apodo }: { inviteCode: string; apodo: string }) => {
       ApodoSchema.parse(apodo)
       const { data, error } = await supabase
-        .from('polla_participants')
-        .insert({ polla_id: pollaId, user_id: user!.id, apodo, status: 'pending' })
-        .select()
-        .single()
+        .rpc('join_polla_by_invite_code', {
+          p_invite_code: inviteCode.trim().toUpperCase(),
+          p_apodo: apodo.trim(),
+        })
       if (error) throw error
-      return data
+      return data as { id: string; polla_id: string; apodo: string; status: string }
     },
-    onSuccess: (_data, { pollaId }) => {
-      qc.invalidateQueries({ queryKey: ['participants', pollaId] })
-      qc.invalidateQueries({ queryKey: ['my_participant', pollaId, user?.id] })
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['participants', data.polla_id] })
+      qc.invalidateQueries({ queryKey: ['my_participant', data.polla_id, user?.id] })
+      qc.invalidateQueries({ queryKey: ['pollas_participando', user?.id] })
     },
   })
 }

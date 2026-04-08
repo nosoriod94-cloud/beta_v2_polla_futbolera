@@ -151,7 +151,7 @@ export default function Home() {
     e.preventDefault()
     if (!pollaEncontrada || !joinApodo.trim()) return
     try {
-      await joinPolla.mutateAsync({ pollaId: pollaEncontrada.id, apodo: joinApodo.trim() })
+      await joinPolla.mutateAsync({ inviteCode: joinCode.trim(), apodo: joinApodo.trim() })
       toast({ title: 'Solicitud enviada', description: 'El admin debe aprobarte para participar.' })
       setJoinOpen(false)
       setJoinCode('')
