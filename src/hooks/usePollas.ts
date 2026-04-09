@@ -234,11 +234,9 @@ export function useAllLicenses() {
 
 export function useGrantLicense() {
   const qc = useQueryClient()
-  const { user } = useAuth()
   return useMutation({
     mutationFn: async ({ email, clienteNombre }: { email: string; clienteNombre?: string }) => {
       const { data, error } = await supabase.rpc('grant_license', {
-        p_superadmin_id: user!.id,
         p_email: email,
         p_cliente_nombre: clienteNombre || null,
       })
@@ -263,11 +261,9 @@ export function useLookupLicenseCode() {
 
 export function useToggleLicenseActive() {
   const qc = useQueryClient()
-  const { user } = useAuth()
   return useMutation({
     mutationFn: async ({ email, active }: { email: string; active: boolean }) => {
       const { error } = await supabase.rpc('toggle_license_active', {
-        p_superadmin_id: user!.id,
         p_email: email,
         p_active: active,
       })

@@ -205,3 +205,20 @@ export function useUpdateJornada() {
     },
   })
 }
+
+export function useUnlockJornada() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ pollaId, jornadaId }: { pollaId: string; jornadaId: string }) => {
+      const { error } = await supabase
+        .from('matches')
+        .update({ is_unlocked: true })
+        .eq('polla_id', pollaId)
+        .eq('jornada_id', jornadaId)
+      if (error) throw error
+    },
+    onSuccess: (_data, { pollaId }) => {
+      qc.invalidateQueries({ queryKey: ['matches', pollaId] })
+    },
+  })
+}

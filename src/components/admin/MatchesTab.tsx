@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
-import { useJornadas, useMatches, useCreateMatch, useUpdateMatch, useDeleteMatch } from '@/hooks/useMatches'
+import { useJornadas, useMatches, useCreateMatch, useUpdateMatch, useDeleteMatch, useUnlockJornada } from '@/hooks/useMatches'
+import { useSeedWorldCup } from '@/hooks/useSeedWorldCup'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { getReadableError } from '@/lib/errorMessages'
-import { Plus, Download, Upload, Lock, Unlock, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Download, Upload, Lock, Unlock, Pencil, Trash2, Globe, ClipboardList } from 'lucide-react'
 import type { MatchResult } from '@/lib/database.types'
 import {
   bogotaInputToUTC, utcToBogotaInput, formatBogota,
@@ -17,6 +18,7 @@ import {
   resultLabels, type CsvRow,
 } from '@/lib/adminUtils'
 import ImportMatchesDialog from './ImportMatchesDialog'
+import BatchResultsDialog from './BatchResultsDialog'
 
 interface MatchesTabProps {
   pollaId: string
@@ -29,6 +31,14 @@ export default function MatchesTab({ pollaId }: MatchesTabProps) {
   const createMatch = useCreateMatch()
   const updateMatch = useUpdateMatch()
   const deleteMatch = useDeleteMatch()
+  const { seed, seeding, progress, total } = useSeedWorldCup()
+  const unlockJornada = useUnlockJornada()
+
+  // Seed Mundial 2026 dialog
+  const [seedOpen, setSeedOpen] = useState(false)
+
+  // Batch results dialog
+  const [batchJornada, setBatchJornada] = useState<{ id: string; nombre: string } | null>(null)
 
   // Create match form
   const [matchOpen, setMatchOpen] = useState(false)
@@ -181,8 +191,81 @@ export default function MatchesTab({ pollaId }: MatchesTabProps) {
     })
   }
 
+  async function handleSeedWorldCup() {
+    setSeedOpen(false)
+    try {
+      await seed(pollaId)
+      toast({
+        title: '¡Listo! Mundial 2026 cargado',
+        description: '12 grupos · 72 partidos creados. Ajusta los puntos por acierto de cada grupo según tu polla.',
+      })
+    } catch (err: unknown) {
+      toast({ title: 'Error al cargar el Mundial', description: getReadableError(err), variant: 'destructive' })
+    }
+  }
+
   return (
     <div className="space-y-4 mt-4">
+      {/* Seed Mundial 2026 — solo visible cuando no hay jornadas ni partidos */}
+      {jornadas.length === 0 && matches.length === 0 && (
+        <Card className="border-dashed border-emerald-500/30 bg-emerald-500/5">
+          <CardContent className="py-5 px-4 flex flex-col items-center gap-3 text-center">
+            <Globe className="h-8 w-8 text-emerald-400" />
+            <div>
+              <p className="font-semibold text-sm">Cargar partidos del Mundial 2026</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Crea automáticamente los 12 grupos y 72 partidos de la fase de grupos.
+              </p>
+            </div>
+            {seeding ? (
+              <div className="w-full space-y-1.5">
+                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                  <div
+                    className="h-2 bg-emerald-500 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.round((progress / total) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Cargando Grupo {progress + 1} de {total}…
+                </p>
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={() => setSeedOpen(true)}
+              >
+                <Globe className="h-4 w-4 mr-1.5" /> Cargar Mundial 2026
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Confirmation dialog for seed */}
+      <Dialog open={seedOpen} onOpenChange={setSeedOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Cargar partidos del Mundial 2026?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>Se crearán <strong className="text-foreground">12 grupos</strong> (Grupo A–L) y <strong className="text-foreground">72 partidos</strong> de la fase de grupos con:</p>
+            <ul className="list-disc list-inside space-y-1 pl-1">
+              <li>Equipos, fechas y estadios oficiales</li>
+              <li>Horarios en UTC (se muestran en hora Bogotá en la app)</li>
+              <li>1 punto por acierto (puedes editar cada grupo después)</li>
+            </ul>
+            <p className="text-xs">Esta acción no se puede deshacer fácilmente. Solo disponible cuando la polla no tiene partidos.</p>
+          </div>
+          <div className="flex gap-2 mt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setSeedOpen(false)}>Cancelar</Button>
+            <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={handleSeedWorldCup}>
+              Sí, cargar Mundial
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Action bar */}
       <div className="flex gap-2 flex-wrap">
         <Dialog open={matchOpen} onOpenChange={setMatchOpen}>
@@ -284,11 +367,45 @@ export default function MatchesTab({ pollaId }: MatchesTabProps) {
             .sort((a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime())
           return (
             <div key={jornada.id} className="space-y-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-semibold text-sm">{jornada.nombre}</h3>
                 <Badge variant="secondary" className="text-xs">
                   {jornada.puntos_por_acierto} pts/acierto
                 </Badge>
+                {/* Botones de acción de jornada — push to right */}
+                <div className="flex items-center gap-1 ml-auto">
+                  {/* Batch unlock: solo si hay partidos bloqueados no cerrados por tiempo */}
+                  {jornadaMatches.some(m =>
+                    !m.is_unlocked && new Date(m.fecha_hora) > new Date(Date.now() + 60_000)
+                  ) && (
+                    <Button
+                      size="sm" variant="outline"
+                      className="h-6 text-xs border-green-300 text-green-700 hover:bg-green-50 px-2"
+                      disabled={unlockJornada.isPending}
+                      onClick={async () => {
+                        if (!confirm(`¿Abrir todos los partidos de ${jornada.nombre}?`)) return
+                        try {
+                          await unlockJornada.mutateAsync({ pollaId, jornadaId: jornada.id })
+                          toast({ title: `${jornada.nombre} desbloqueada` })
+                        } catch (err: unknown) {
+                          toast({ title: 'Error', description: getReadableError(err), variant: 'destructive' })
+                        }
+                      }}
+                    >
+                      <Unlock className="h-3 w-3 mr-1" /> Abrir todo
+                    </Button>
+                  )}
+                  {/* Ingresar resultados en lote: visible cuando hay partidos pasados sin resultado */}
+                  {jornadaMatches.some(m => new Date(m.fecha_hora) <= new Date() && !m.resultado) && (
+                    <Button
+                      size="sm" variant="outline"
+                      className="h-6 text-xs border-orange-300 text-orange-700 hover:bg-orange-50 px-2"
+                      onClick={() => setBatchJornada({ id: jornada.id, nombre: jornada.nombre })}
+                    >
+                      <ClipboardList className="h-3 w-3 mr-1" /> Resultados
+                    </Button>
+                  )}
+                </div>
               </div>
               {jornadaMatches.length === 0 ? (
                 <p className="text-xs text-muted-foreground pl-2">Sin partidos en esta jornada.</p>
@@ -486,6 +603,21 @@ export default function MatchesTab({ pollaId }: MatchesTabProps) {
         importing={csvImporting}
         onImport={handleCSVImport}
       />
+
+      {/* Batch results dialog */}
+      {batchJornada && (
+        <BatchResultsDialog
+          open={!!batchJornada}
+          onOpenChange={v => { if (!v) setBatchJornada(null) }}
+          pollaId={pollaId}
+          jornadaNombre={batchJornada.nombre}
+          matches={matches.filter(m =>
+            m.jornada_id === batchJornada.id &&
+            new Date(m.fecha_hora) <= new Date() &&
+            !m.resultado
+          )}
+        />
+      )}
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { useStandings } from '@/hooks/useStandings'
 import { useMyParticipant } from '@/hooks/useParticipants'
 import { cn } from '@/lib/utils'
 import { Star, TrendingUp, Target, Zap } from 'lucide-react'
+import StandingsSkeleton from '@/components/skeletons/StandingsSkeleton'
 
 /* ─── Podium config ────────────────────────────────────────────────── */
 const PODIUM = [
@@ -145,17 +146,7 @@ export default function Posiciones() {
   const { data: standings = [], isLoading } = useStandings(pollaId)
   const { data: myParticipant } = useMyParticipant(pollaId)
 
-  if (isLoading) {
-    return (
-      <div className="p-4 space-y-3 pb-24">
-        <div className="pt-4 h-10 w-48 rounded-xl bg-muted/40 animate-pulse" />
-        <div className="grid grid-cols-3 gap-2">
-          {[0,1,2].map(i => <div key={i} className="h-40 rounded-2xl bg-muted/30 animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />)}
-        </div>
-        {[0,1,2,3].map(i => <div key={i} className="h-16 rounded-xl bg-muted/20 animate-pulse" style={{ animationDelay: `${i * 80}ms` }} />)}
-      </div>
-    )
-  }
+  if (isLoading) return <StandingsSkeleton />
 
   const top3    = standings.slice(0, 3)
   const rest    = standings.slice(3)

@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { toast } from 'sonner'
 
 interface AuthContextValue {
   user: User | null
@@ -18,6 +19,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const isSigningOut = useRef(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -26,7 +28,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' && !isSigningOut.current) {
+        // Sesión expirada inesperadamente (no por signOut() del usuario)
+        toast.error('Tu sesión expiró. Por favor inicia sesión de nuevo.')
+        window.location.href = '/auth'
+        return
+      }
       setSession(session)
       setUser(session?.user ?? null)
     })
@@ -57,7 +65,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
+    isSigningOut.current = true
     await supabase.auth.signOut()
+    isSigningOut.current = false
   }
 
   return (

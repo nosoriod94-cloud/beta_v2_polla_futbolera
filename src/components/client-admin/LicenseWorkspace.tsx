@@ -12,6 +12,9 @@ import {
   Plus, Shield, Lock, AlertTriangle, ArrowLeft,
   Check, Copy, Share2, Settings2, ChevronRight,
 } from 'lucide-react'
+import OnboardingChecklist from './OnboardingChecklist'
+import WhatsAppIcon from '@/components/icons/WhatsAppIcon'
+import { shareViaWhatsApp } from '@/lib/shareWhatsApp'
 
 interface LicenseWorkspaceProps {
   license: MyLicense
@@ -135,24 +138,21 @@ export default function LicenseWorkspace({ license, onBack }: LicenseWorkspacePr
       {loadingAdmin ? (
         <p className="text-sm text-slate-400 text-center py-4">Cargando...</p>
       ) : adminPollas.length === 0 ? (
-        <Card className="border-dashed border-slate-700 bg-transparent">
-          <CardContent className="py-8 text-center text-slate-500">
-            <Shield className="h-8 w-8 mx-auto mb-2 opacity-40" />
-            {canCreate ? (
-              <>
-                <p className="text-sm">No hay pollas en esta licencia.</p>
-                <p className="text-xs mt-1">Haz clic en "Nueva" para comenzar.</p>
-              </>
-            ) : (
-              <>
-                <Lock className="h-5 w-5 mx-auto mb-1 opacity-40" />
-                <p className="text-sm font-medium text-slate-400">
-                  {license.is_active ? 'Límite alcanzado' : 'Licencia suspendida'}
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        canCreate ? (
+          <OnboardingChecklist
+            license={license}
+            onCreatePolla={() => setCreateOpen(true)}
+          />
+        ) : (
+          <Card className="border-dashed border-slate-700 bg-transparent">
+            <CardContent className="py-8 text-center text-slate-500">
+              <Lock className="h-5 w-5 mx-auto mb-1 opacity-40" />
+              <p className="text-sm font-medium text-slate-400">
+                {license.is_active ? 'Límite alcanzado' : 'Licencia suspendida'}
+              </p>
+            </CardContent>
+          </Card>
+        )
       ) : (
         <div className="space-y-3">
           {adminPollas.map(polla => {
@@ -193,6 +193,14 @@ export default function LicenseWorkspace({ license, onBack }: LicenseWorkspacePr
                             onClick={() => handleShare(polla.nombre, inviteCode)}
                           >
                             <Share2 className="h-3.5 w-3.5 mr-1" /> Compartir
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="h-8 px-3 text-xs bg-[#25D366] hover:bg-[#1ebe5d] text-white border-0"
+                            onClick={() => shareViaWhatsApp(inviteCode)}
+                            title="Compartir por WhatsApp"
+                          >
+                            <WhatsAppIcon className="h-3.5 w-3.5 mr-1" /> WhatsApp
                           </Button>
                         </div>
                       </div>

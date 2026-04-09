@@ -14,10 +14,7 @@ import { Logo } from '@/components/Logo'
 import AdminPollaCard from '@/components/home/AdminPollaCard'
 import ParticipantPollaCard from '@/components/home/ParticipantPollaCard'
 import JoinPollaDialog from '@/components/home/JoinPollaDialog'
-
-function PollaCardSkeleton() {
-  return <div className="h-20 rounded-2xl bg-muted/30 animate-pulse" />
-}
+import HomeSkeleton from '@/components/skeletons/HomeSkeleton'
 
 export default function Home() {
   const { user, signOut } = useAuth()
@@ -48,6 +45,8 @@ export default function Home() {
   }
 
   const isSuspended = license !== undefined && license !== null && !license.isActive
+
+  if (loadingAdmin && loadingPart) return <HomeSkeleton />
 
   return (
     <div className="p-4 space-y-6 pb-24">
@@ -125,8 +124,8 @@ export default function Home() {
 
         {loadingAdmin ? (
           <div className="space-y-2">
-            <PollaCardSkeleton />
-            <PollaCardSkeleton />
+            <div className="h-20 rounded-2xl bg-muted/30 animate-pulse" />
+            <div className="h-20 rounded-2xl bg-muted/30 animate-pulse" style={{ animationDelay: '60ms' }} />
           </div>
         ) : adminPollas.length === 0 ? (
           <EmptyState
@@ -185,7 +184,7 @@ export default function Home() {
 
         {loadingPart ? (
           <div className="space-y-2">
-            <PollaCardSkeleton />
+            <div className="h-20 rounded-2xl bg-muted/30 animate-pulse" />
           </div>
         ) : participatingPollas.length === 0 ? (
           <EmptyState

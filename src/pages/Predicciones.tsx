@@ -10,14 +10,16 @@ import { format, isPast, addMinutes } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import PredictionToggle from '@/components/predictions/PredictionToggle'
+import PredictionsSkeleton from '@/components/skeletons/PredictionsSkeleton'
+import CountdownTimer from '@/components/predictions/CountdownTimer'
 
 export default function Predicciones() {
   const { pollaId } = useParams<{ pollaId: string }>()
   const { user } = useAuth()
 
   const { data: participant } = useMyParticipant(pollaId)
-  const { data: jornadas = [] } = useJornadas(pollaId)
-  const { data: matches = [] } = useMatches(pollaId)
+  const { data: jornadas = [], isLoading: loadingJornadas } = useJornadas(pollaId)
+  const { data: matches = [], isLoading: loadingMatches } = useMatches(pollaId)
   const { data: myPredictions = {} } = useMyPredictions(pollaId, participant?.id)
 
   // IDs que el usuario ha toggleado manualmente respecto a su estado natural.
@@ -31,6 +33,8 @@ export default function Predicciones() {
       return next
     })
   }
+
+  if (loadingJornadas || loadingMatches) return <PredictionsSkeleton />
 
   if (!participant) {
     return (
@@ -196,11 +200,14 @@ export default function Predicciones() {
                       )}
                     </div>
 
-                    {/* Date */}
-                    <p className="text-xs text-muted-foreground/70">
-                      {format(kickoff, "d MMM · HH:mm", { locale: es })}
-                      {match.estadio && <span className="ml-1.5 opacity-60">· {match.estadio}</span>}
-                    </p>
+                    {/* Date + countdown */}
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground/70">
+                        {format(kickoff, "d MMM · HH:mm", { locale: es })}
+                        {match.estadio && <span className="ml-1.5 opacity-60">· {match.estadio}</span>}
+                      </p>
+                      {!isLocked && <CountdownTimer fechaHora={match.fecha_hora} />}
+                    </div>
 
                     {/* Prediction buttons */}
                     <PredictionToggle

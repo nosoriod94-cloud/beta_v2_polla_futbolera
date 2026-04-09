@@ -211,7 +211,6 @@ export function useLimitRequest(pollaId: string | undefined) {
 // SuperAdmin: resuelve una solicitud (aprueba o rechaza)
 export function useResolveLimitRequest() {
   const qc = useQueryClient()
-  const { user } = useAuth()
   return useMutation({
     mutationFn: async ({
       requestId,
@@ -223,7 +222,6 @@ export function useResolveLimitRequest() {
       notes?: string
     }) => {
       const { error } = await supabase.rpc('resolve_limit_request', {
-        p_superadmin_id: user!.id,
         p_request_id: requestId,
         p_status: status,
         p_notes: notes ?? null,

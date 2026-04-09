@@ -30,7 +30,12 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 30,
-      retry: 1,
+      retry: (failureCount, error) => {
+        const msg = (error as Error)?.message ?? ''
+        const code = (error as { code?: string })?.code
+        if (msg.includes('JWT') || code === 'PGRST301') return false
+        return failureCount < 1
+      },
     },
   },
 });
