@@ -43,13 +43,20 @@ export function useNotifications() {
     queryKey: ['notifications', user?.id],
     enabled: !!user,
     staleTime: 60_000,
+    // No reintentar — si la tabla no existe aún (migración pendiente) fallará
+    // silenciosamente en vez de romper el BottomNav con un ErrorBoundary.
+    retry: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50)
-      if (error) throw error
+      // Si la tabla no existe todavía, devolver array vacío en lugar de tirar
+      if (error) {
+        console.warn('useNotifications:', error.message)
+        return [] as Notification[]
+      }
       return data as Notification[]
     },
   })
