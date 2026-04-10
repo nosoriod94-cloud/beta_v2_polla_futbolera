@@ -135,7 +135,7 @@ export function usePolla(pollaId: string | undefined) {
 export function usePollaByInviteCode(inviteCode: string | undefined) {
   return useQuery({
     queryKey: ['polla_invite', inviteCode],
-    enabled: !!inviteCode && inviteCode.length >= 6,
+    enabled: !!inviteCode && inviteCode.length >= 4,
     queryFn: async () => {
       const { data, error } = await supabase
         .rpc('get_polla_by_invite_code', { p_invite_code: inviteCode!.trim().toUpperCase() })

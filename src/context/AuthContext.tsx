@@ -20,16 +20,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const isSigningOut = useRef(false)
+  // Solo redirigir por SIGNED_OUT si el usuario ya tenía sesión activa.
+  // Evita falsos positivos durante el carga inicial (sin sesión) o
+  // durante el flujo de sign-in de Supabase (algunas versiones emiten
+  // SIGNED_OUT antes de SIGNED_IN al autenticar por primera vez).
+  const hadSession = useRef(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) hadSession.current = true
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' && !isSigningOut.current) {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        hadSession.current = true
+      }
+      if (event === 'SIGNED_OUT' && !isSigningOut.current && hadSession.current) {
         // Sesión expirada inesperadamente (no por signOut() del usuario)
         toast.error('Tu sesión expiró. Por favor inicia sesión de nuevo.')
         window.location.href = '/auth'
