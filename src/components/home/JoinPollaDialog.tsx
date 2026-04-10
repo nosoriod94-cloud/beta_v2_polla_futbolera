@@ -54,7 +54,7 @@ export default function JoinPollaDialog({ open, onOpenChange }: JoinPollaDialogP
               className="font-mono tracking-widest text-center text-lg"
               maxLength={8}
             />
-            {joinCode.length >= 6 && (
+            {joinCode.length >= 4 && (
               <div className={cn(
                 'text-xs rounded-xl px-3 py-2 border',
                 pollaEncontrada

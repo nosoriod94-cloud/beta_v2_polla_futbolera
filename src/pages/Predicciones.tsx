@@ -17,7 +17,7 @@ export default function Predicciones() {
   const { pollaId } = useParams<{ pollaId: string }>()
   const { user } = useAuth()
 
-  const { data: participant } = useMyParticipant(pollaId)
+  const { data: participant, isLoading: loadingParticipant } = useMyParticipant(pollaId)
   const { data: jornadas = [], isLoading: loadingJornadas } = useJornadas(pollaId)
   const { data: matches = [], isLoading: loadingMatches } = useMatches(pollaId)
   const { data: myPredictions = {} } = useMyPredictions(pollaId, participant?.id)
@@ -34,7 +34,7 @@ export default function Predicciones() {
     })
   }
 
-  if (loadingJornadas || loadingMatches) return <PredictionsSkeleton />
+  if (loadingJornadas || loadingMatches || loadingParticipant) return <PredictionsSkeleton />
 
   if (!participant) {
     return (

@@ -145,7 +145,7 @@ export default function ClientAdmin() {
                       className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 font-mono tracking-widest text-center text-lg"
                       maxLength={8}
                     />
-                    {joinCode.length >= 6 && (
+                    {joinCode.length >= 4 && (
                       <div className={`text-xs rounded-lg px-3 py-2 ${pollaEncontrada ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
                         {pollaEncontrada
                           ? `✓ Polla encontrada: "${pollaEncontrada.nombre}"`
