@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import {
   useMyLicenses, useSetLicenseNombre,
-  useMyParticipatingPollas, usePollaByInviteCode, type MyLicense,
+  useMyParticipatingPollas, usePollaByInviteCode, type MyLicense, type ParticipatingPolla,
 } from '@/hooks/usePollas'
 import { useJoinPolla, useApodoAvailable } from '@/hooks/useParticipants'
 import { Button } from '@/components/ui/button'
@@ -195,20 +195,18 @@ export default function ClientAdmin() {
             </Card>
           ) : (
             <div className="space-y-2">
-              {participatingPollas.map(pp => {
-                const polla = pp.pollas as unknown as { id: string; nombre: string } | null
-                if (!polla) return null
+              {(participatingPollas as ParticipatingPolla[]).map(pp => {
                 const statusInfo = statusLabels[pp.status] ?? statusLabels.pending
                 return (
                   <Card
                     key={pp.polla_id}
                     className={`cursor-pointer bg-slate-900 border-slate-800 hover:border-blue-800 transition-colors ${pp.status !== 'authorized' ? 'opacity-75' : ''}`}
-                    onClick={() => pp.status === 'authorized' && navigate(`/polla/${pp.polla_id}`)}
+                    onClick={() => pp.status === 'authorized' && navigate(`/polla/${pp.polla_id}/predicciones`)}
                   >
                     <CardHeader className="py-3 px-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <CardTitle className="text-base text-white">{polla.nombre}</CardTitle>
+                          <CardTitle className="text-base text-white">{pp.polla_nombre}</CardTitle>
                           <p className="text-xs text-slate-400 mt-0.5">Apodo: <strong className="text-slate-300">{pp.apodo}</strong></p>
                         </div>
                         <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ${statusInfo.color}`}>

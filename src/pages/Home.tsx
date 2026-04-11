@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
-import { useMyPollas, useCreatePolla, useMyParticipatingPollas, useLicense } from '@/hooks/usePollas'
+import { useMyPollas, useCreatePolla, useMyParticipatingPollas, useLicense, type ParticipatingPolla } from '@/hooks/usePollas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -194,19 +194,15 @@ export default function Home() {
           />
         ) : (
           <div className="space-y-2">
-            {participatingPollas.map((pp, i) => {
-              const polla = pp.pollas as unknown as { id: string; nombre: string } | null
-              if (!polla) return null
-              return (
-                <div key={pp.polla_id} style={{ animationDelay: `${i * 50}ms` }}>
-                  <ParticipantPollaCard
-                    pp={pp}
-                    polla={polla}
-                    onClick={() => navigate(`/polla/${pp.polla_id}/predicciones`)}
-                  />
-                </div>
-              )
-            })}
+            {(participatingPollas as ParticipatingPolla[]).map((pp, i) => (
+              <div key={pp.polla_id} style={{ animationDelay: `${i * 50}ms` }}>
+                <ParticipantPollaCard
+                  pp={pp}
+                  polla={{ id: pp.polla_id, nombre: pp.polla_nombre }}
+                  onClick={() => navigate(`/polla/${pp.polla_id}/predicciones`)}
+                />
+              </div>
+            ))}
           </div>
         )}
       </section>

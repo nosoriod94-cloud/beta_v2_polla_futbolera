@@ -26,19 +26,23 @@ export function useMyPollas(licenseId?: string) {
   })
 }
 
+export type ParticipatingPolla = {
+  polla_id: string
+  polla_nombre: string
+  status: string
+  apodo: string
+  created_at: string
+}
+
 export function useMyParticipatingPollas() {
   const { user } = useAuth()
   return useQuery({
     queryKey: ['pollas_participando', user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('polla_participants')
-        .select('polla_id, status, apodo, pollas(*)')
-        .eq('user_id', user!.id)
-        .order('created_at', { ascending: false })
+      const { data, error } = await supabase.rpc('get_my_participating_pollas')
       if (error) throw error
-      return data
+      return data as ParticipatingPolla[]
     },
   })
 }
