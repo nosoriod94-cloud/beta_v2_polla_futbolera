@@ -1,16 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
 export function useStandings(pollaId: string | undefined) {
   const qc = useQueryClient()
+  const channelId = useRef(`standings:${pollaId}:${Math.random().toString(36).slice(2)}`)
 
   // Suscripción Realtime: invalida el cache cuando cambia predictions o matches
   useEffect(() => {
     if (!pollaId) return
 
     const channel = supabase
-      .channel(`standings-${pollaId}`)
+      .channel(channelId.current)
       .on(
         'postgres_changes',
         {

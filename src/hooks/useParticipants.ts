@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
@@ -32,11 +32,14 @@ export function useApodoAvailable(pollaId: string | undefined, apodo: string) {
 // Se suscribe a cambios en tiempo real para que el panel se actualice automáticamente.
 export function useParticipants(pollaId: string | undefined) {
   const qc = useQueryClient()
+  // Unique channel name per hook instance to avoid "cannot add callbacks after subscribe()"
+  // when the same hook is mounted in multiple components simultaneously.
+  const channelId = useRef(`participants:${pollaId}:${Math.random().toString(36).slice(2)}`)
 
   useEffect(() => {
     if (!pollaId) return
     const channel = supabase
-      .channel(`participants:${pollaId}`)
+      .channel(channelId.current)
       .on(
         'postgres_changes',
         {

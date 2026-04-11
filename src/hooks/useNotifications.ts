@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
@@ -17,12 +17,13 @@ export type Notification = {
 export function useNotifications() {
   const { user } = useAuth()
   const qc = useQueryClient()
+  const channelId = useRef(`notifications:${user?.id ?? 'anon'}:${Math.random().toString(36).slice(2)}`)
 
   // Suscripción realtime para nuevas notificaciones
   useEffect(() => {
     if (!user) return
     const channel = supabase
-      .channel('notifications:' + user.id)
+      .channel(channelId.current)
       .on(
         'postgres_changes',
         {
