@@ -28,6 +28,9 @@ create index if not exists idx_notifications_user_polla
 
 alter table notifications enable row level security;
 
+drop policy if exists "notifications: select own" on notifications;
+drop policy if exists "notifications: update own" on notifications;
+
 create policy "notifications: select own"
   on notifications for select
   using (auth.uid() = user_id);
@@ -94,7 +97,7 @@ begin
       when 'A_wins' then 'Ganó ' || new.equipo_a
       when 'B_wins' then 'Ganó ' || new.equipo_b
       when 'draw'   then 'Empate'
-      else new.resultado
+      else new.resultado::text
     end;
 
     insert into notifications (user_id, polla_id, type, title, body)
