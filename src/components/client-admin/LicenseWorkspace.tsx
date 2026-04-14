@@ -10,11 +10,12 @@ import { useToast } from '@/hooks/use-toast'
 import { getReadableError } from '@/lib/errorMessages'
 import {
   Plus, Shield, Lock, AlertTriangle, ArrowLeft,
-  Check, Copy, Share2, Settings2, ChevronRight,
+  Check, Copy, Share2, Settings2, ChevronRight, Eye,
 } from 'lucide-react'
 import OnboardingChecklist from './OnboardingChecklist'
 import WhatsAppIcon from '@/components/icons/WhatsAppIcon'
 import { shareViaWhatsApp } from '@/lib/shareWhatsApp'
+import PollaPrediccionesSheet from './PollaPrediccionesSheet'
 
 interface LicenseWorkspaceProps {
   license: MyLicense
@@ -31,6 +32,7 @@ export default function LicenseWorkspace({ license, onBack }: LicenseWorkspacePr
   const [newPollaName, setNewPollaName] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [predSheet, setPredSheet] = useState<{ id: string; nombre: string } | null>(null)
 
   const canCreate = license.is_active && license.pollas_created < license.pollas_limit
 
@@ -207,13 +209,21 @@ export default function LicenseWorkspace({ license, onBack }: LicenseWorkspacePr
                     </div>
                   )}
 
-                  <Button
-                    className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 h-8 text-xs"
-                    onClick={() => navigate(`/admin/${polla.id}`)}
-                  >
-                    <Settings2 className="h-3.5 w-3.5 mr-1.5" /> Gestionar polla
-                    <ChevronRight className="h-3.5 w-3.5 ml-auto" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 h-8 text-xs"
+                      onClick={() => navigate(`/admin/${polla.id}`)}
+                    >
+                      <Settings2 className="h-3.5 w-3.5 mr-1.5" /> Gestionar
+                      <ChevronRight className="h-3.5 w-3.5 ml-auto" />
+                    </Button>
+                    <Button
+                      className="flex-1 bg-blue-900/60 hover:bg-blue-800/60 text-blue-300 border border-blue-700/40 h-8 text-xs"
+                      onClick={() => setPredSheet({ id: polla.id, nombre: polla.nombre })}
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1.5" /> Ver predicciones
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )
@@ -225,6 +235,16 @@ export default function LicenseWorkspace({ license, onBack }: LicenseWorkspacePr
             </p>
           )}
         </div>
+      )}
+
+      {/* Predictions sheet */}
+      {predSheet && (
+        <PollaPrediccionesSheet
+          open={!!predSheet}
+          onOpenChange={v => { if (!v) setPredSheet(null) }}
+          pollaId={predSheet.id}
+          pollaNombre={predSheet.nombre}
+        />
       )}
     </div>
   )
