@@ -2,12 +2,12 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { usePolla } from '@/hooks/usePollas'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Users, Calendar, FileDown, List } from 'lucide-react'
+import { Users, Calendar, Eye, List } from 'lucide-react'
 import AdminHeader from '@/components/admin/AdminHeader'
 import ParticipantsTab from '@/components/admin/ParticipantsTab'
 import JornadasTab from '@/components/admin/JornadasTab'
 import MatchesTab from '@/components/admin/MatchesTab'
-import ExportPredictionsButton from '@/components/admin/ExportPredictionsButton'
+import PredictionsTab from '@/components/admin/PredictionsTab'
 
 export default function Admin() {
   const { pollaId } = useParams<{ pollaId: string }>()
@@ -55,8 +55,8 @@ export default function Admin() {
           <TabsTrigger value="partidos" className="flex-1 text-xs flex items-center gap-1.5">
             <Calendar className="h-3.5 w-3.5" /> Partidos
           </TabsTrigger>
-          <TabsTrigger value="exportar" className="flex-1 text-xs flex items-center gap-1.5">
-            <FileDown className="h-3.5 w-3.5" /> Exportar
+          <TabsTrigger value="predicciones" className="flex-1 text-xs flex items-center gap-1.5">
+            <Eye className="h-3.5 w-3.5" /> Predicciones
           </TabsTrigger>
         </TabsList>
 
@@ -72,8 +72,8 @@ export default function Admin() {
           <MatchesTab pollaId={pollaId!} />
         </TabsContent>
 
-        <TabsContent value="exportar">
-          <ExportPredictionsButton pollaId={pollaId!} />
+        <TabsContent value="predicciones">
+          <PredictionsTab pollaId={pollaId!} />
         </TabsContent>
       </Tabs>
     </div>

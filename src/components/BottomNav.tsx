@@ -1,33 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { NavLink, useMatch } from 'react-router-dom'
 import { Home, Trophy, Star, User, Bell } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUnreadCount } from '@/hooks/useNotifications'
 import NotificationDrawer from './NotificationDrawer'
 
-const LAST_POLLA_KEY = 'lastPollaId'
-
 export default function BottomNav() {
   const pollaMatch = useMatch('/polla/:pollaId/*')
-  const pollaIdFromUrl = pollaMatch?.params.pollaId
+  const pollaId = pollaMatch?.params.pollaId ?? null
   const [notifOpen, setNotifOpen] = useState(false)
   const unread = useUnreadCount()
 
-  // Persist the last visited pollaId so buttons work from any page
-  useEffect(() => {
-    if (pollaIdFromUrl) {
-      localStorage.setItem(LAST_POLLA_KEY, pollaIdFromUrl)
-    }
-  }, [pollaIdFromUrl])
-
-  const pollaId = pollaIdFromUrl ?? localStorage.getItem(LAST_POLLA_KEY) ?? null
-
-  const links = [
-    { to: '/', label: 'Inicio', icon: Home, exact: true },
-    { to: pollaId ? `/polla/${pollaId}/predicciones` : '/', label: 'Predecir', icon: Star, exact: false },
-    { to: pollaId ? `/polla/${pollaId}/posiciones` : '/', label: 'Posiciones', icon: Trophy, exact: false },
-    { to: '/perfil', label: 'Mi perfil', icon: User, exact: false },
-  ]
+  const links = pollaId
+    ? [
+        { to: '/',                                   label: 'Inicio',    icon: Home,   exact: true  },
+        { to: `/polla/${pollaId}/predicciones`,       label: 'Predecir',  icon: Star,   exact: false },
+        { to: `/polla/${pollaId}/posiciones`,         label: 'Posiciones',icon: Trophy, exact: false },
+        { to: '/perfil',                             label: 'Mi perfil', icon: User,   exact: false },
+      ]
+    : [
+        { to: '/',       label: 'Inicio',    icon: Home, exact: true  },
+        { to: '/perfil', label: 'Mi perfil', icon: User, exact: false },
+      ]
 
   return (
     <>
